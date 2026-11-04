@@ -52,6 +52,7 @@ public class EligibilityEngine {
         SUBSCRIBED,
         ALREADY_ASKED,
         PROMPT_PENDING_FOR_PRODUCT,
+        PRODUCT_ALREADY_REVIEWED,
         PRODUCT_RECENTLY_RATED,
         PRODUCT_RECENTLY_SKIPPED_OR_IGNORED,
         NOT_DUE_YET,
@@ -108,6 +109,8 @@ public class EligibilityEngine {
                 .filter(p -> p.getStatus() == PromptStatus.PENDING && !p.isUserInitiated())
                 .map(FeedbackPrompt::getProductId)
                 .collect(Collectors.toSet());
+        Set<String> reviewed = history.stream().filter(p -> p.getStatus() == PromptStatus.ANSWERED)
+                .map(FeedbackPrompt::getProductId).collect(Collectors.toSet());
         Map<String, LocalDate> ratedUntil = new HashMap<>();
         Map<String, LocalDate> skippedUntil = new HashMap<>();
         for (FeedbackPrompt p : history) {
@@ -154,6 +157,9 @@ public class EligibilityEngine {
             } else if (pendingProducts.contains(pid)) {
                 v = Verdict.PROMPT_PENDING_FOR_PRODUCT;
                 detail = "Another prompt for this product is waiting for an answer";
+            } else if (props.oneReviewPerProduct() && reviewed.contains(pid)) {
+                v = Verdict.PRODUCT_ALREADY_REVIEWED;
+                detail = "Household already reviewed this product (one review per product)";
             } else if (ratedUntil.containsKey(pid) && today.isBefore(ratedUntil.get(pid))) {
                 v = Verdict.PRODUCT_RECENTLY_RATED;
                 detail = "Rated recently; not asking again until " + ratedUntil.get(pid);

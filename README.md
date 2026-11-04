@@ -160,7 +160,9 @@ X is stored per product (`products.feedback_delay_days`) and can be changed at r
 2. Products with **no X**: never asked.
 3. Household **subscribed** to the product today (ACTIVE *or* PAUSED): not asked. This also covers one-time extras of a subscribed product.
 4. Each delivered item is asked about **at most once**.
-5. Same product **rated** in the last **30 days**, or **skipped / ignored** in the last **60 days**: not asked.
+5. Same product **already reviewed** (ever, one review per product per household), or **skipped / ignored** in the last **60 days**: not asked.
+   A reorder of a reviewed product gets no card and no "Rate now" (`409 ALREADY_REVIEWED`); My orders shows it as
+   `ALREADY_REVIEWED` with the earlier rating. Set `feedback.one-review-per-product: false` to ask again after 30 days instead.
 6. Ask from **delivery + X** until **delivery + X + 3 days** (the window). Older deliveries are no longer fresh in the user's mind.
 
 **Priority** when several products are eligible. Only the top one is shown:
@@ -174,7 +176,7 @@ X is stored per product (`products.feedback_delay_days`) and can be changed at r
 Ties go to the card closest to expiring, so it isn't lost.
 
 **Bought twice before rating:** all eligible deliveries of that product become **one** card about the
-**most recent** delivery. After it's answered, the 30-day product cooldown stops the other deliveries from being asked about.
+**most recent** delivery. After it's answered, the one-review-per-product rule stops the other deliveries from being asked about.
 
 ### Frequency cap (and why)
 
@@ -291,7 +293,7 @@ already in the cart (`IN_CART`). Ratings from the last 90 days. The `excluded` l
 straight away. Then `/rating` or `/skip` as usual.
 - Works on any delivered item of a product that collects feedback, including one skipped earlier. `409 ALREADY_RATED` / `NOT_DELIVERED`.
 - Marked `source = USER`. It **doesn't count toward the 3-day frequency cap**, because the user chose to rate, so we didn't nag them. An abandoned one is never pushed to the home screen.
-- The rating still counts for the 30-day "don't ask about this product again" rule.
+- The rating still counts as the household's one review of that product: it's never asked about again.
 Open: `GET /api/products`, `GET /api/products/{id}`, `GET /api/products/{id}/issue-options`.
 
 ### Products and images

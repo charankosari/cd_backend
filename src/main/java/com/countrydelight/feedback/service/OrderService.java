@@ -2,6 +2,7 @@ package com.countrydelight.feedback.service;
 
 import com.countrydelight.feedback.common.ApiException;
 import com.countrydelight.feedback.common.TimeProvider;
+import com.countrydelight.feedback.config.FeedbackProperties;
 import com.countrydelight.feedback.domain.Address;
 import com.countrydelight.feedback.domain.CartItem;
 import com.countrydelight.feedback.domain.Customer;
@@ -43,10 +44,11 @@ public class OrderService {
     private final DeliveryService deliveries;
     private final TimeProvider time;
     private final AddressService addresses;
+    private final FeedbackProperties props;
 
     public OrderService(OrderRepository orders, CartItemRepository cart, CustomerRepository customers,
                         FeedbackRepository feedbacks, CatalogService catalog, DeliveryService deliveries,
-                        TimeProvider time, AddressService addresses) {
+                        TimeProvider time, AddressService addresses, FeedbackProperties props) {
         this.orders = orders;
         this.cart = cart;
         this.customers = customers;
@@ -55,6 +57,7 @@ public class OrderService {
         this.deliveries = deliveries;
         this.time = time;
         this.addresses = addresses;
+        this.props = props;
     }
 
     /**
@@ -101,8 +104,8 @@ public class OrderService {
         String message = created.size() == 1
                 ? "Order placed for " + PromptService.CARD_DATE.format(created.get(0).getDeliveryDate())
                 : created.size() + " orders placed";
-        Map<Long, Feedback> none = Map.of();
-        return new PlaceOrderResponse(created.stream().map(o -> view(o, none, today)).toList(), message);
+        Reviews reviews = reviews(customerId);
+        return new PlaceOrderResponse(created.stream().map(o -> view(o, reviews, today)).toList(), message);
     }
 
     /** "My orders": newest first, with each item's feedback state. */
@@ -110,10 +113,10 @@ public class OrderService {
     public List<OrderView> list(Long customerId) {
         requireCustomer(customerId);
         deliveries.markDueOrdersDelivered(customerId);
-        Map<Long, Feedback> feedbackByItem = feedbackByItem(customerId);
+        Reviews reviews = reviews(customerId);
         LocalDate today = time.today();
         return orders.findByCustomerIdOrderByDeliveryDateDescIdDesc(customerId).stream()
-                .map(o -> view(o, feedbackByItem, today))
+                .map(o -> view(o, reviews, today))
                 .toList();
     }
 
@@ -124,19 +127,28 @@ public class OrderService {
         CustomerOrder order = orders.findById(orderId)
                 .filter(o -> o.getCustomerId().equals(customerId))
                 .orElseThrow(() -> ApiException.notFound("Order " + orderId));
-        return view(order, feedbackByItem(customerId), time.today());
+        return view(order, reviews(customerId), time.today());
     }
 
     // ------------------------------------------------------------------ helpers
 
-    private Map<Long, Feedback> feedbackByItem(Long customerId) {
-        return feedbacks.findByCustomerId(customerId).stream()
-                .collect(Collectors.toMap(Feedback::getOrderItemId, Function.identity(), (a, b) -> a));
+    /** The household's reviews: per delivered item, and the first review per product (one review per product). */
+    private record Reviews(Map<Long, Feedback> byItem, Map<String, Feedback> byProduct) {
     }
 
-    private OrderView view(CustomerOrder o, Map<Long, Feedback> feedbackByItem, LocalDate today) {
+    private Reviews reviews(Long customerId) {
+        List<Feedback> all = feedbacks.findByCustomerId(customerId);
+        Map<Long, Feedback> byItem = all.stream()
+                .collect(Collectors.toMap(Feedback::getOrderItemId, Function.identity(), (a, b) -> a));
+        Map<String, Feedback> byProduct = all.stream()
+                .collect(Collectors.toMap(Feedback::getProductId, Function.identity(),
+                        (a, b) -> a.getCreatedAt().isBefore(b.getCreatedAt()) ? a : b));
+        return new Reviews(byItem, byProduct);
+    }
+
+    private OrderView view(CustomerOrder o, Reviews reviews, LocalDate today) {
         List<OrderItemView> items = o.getItems().stream()
-                .map(i -> itemView(o, i, feedbackByItem.get(i.getId())))
+                .map(i -> itemView(o, i, reviews.byItem().get(i.getId()), reviews.byProduct().get(i.getProductId())))
                 .toList();
         int qty = items.stream().mapToInt(OrderItemView::quantity).sum();
         BigDecimal total = items.stream().map(OrderItemView::lineTotal).reduce(BigDecimal.ZERO, BigDecimal::add);
@@ -144,15 +156,15 @@ public class OrderService {
                 qty, total, items, o.getAddressId(), o.getDeliveryAddress());
     }
 
-    private OrderItemView itemView(CustomerOrder o, OrderItem i, Feedback feedback) {
+    private OrderItemView itemView(CustomerOrder o, OrderItem i, Feedback feedback, Feedback productReview) {
         Product p = catalog.product(i.getProductId());
         BigDecimal price = i.getUnitPrice() == null ? BigDecimal.ZERO : i.getUnitPrice();
         return new OrderItemView(i.getId(), p.getId(), p.getName(), p.getUnit(), i.getQuantity(), price,
                 price.multiply(BigDecimal.valueOf(i.getQuantity())), i.getPurchaseType().name(),
-                itemFeedback(o, i, p, feedback), catalog.imageUrl(p));
+                itemFeedback(o, i, p, feedback, productReview), catalog.imageUrl(p));
     }
 
-    private ItemFeedback itemFeedback(CustomerOrder o, OrderItem i, Product p, Feedback feedback) {
+    private ItemFeedback itemFeedback(CustomerOrder o, OrderItem i, Product p, Feedback feedback, Feedback productReview) {
         boolean feedbackEnabled = p.getFeedbackDelayDays() != null;
         LocalDate autoAskOn = feedbackEnabled && i.getPurchaseType() == PurchaseType.ONE_TIME
                 ? o.getDeliveryDate().plusDays(p.getFeedbackDelayDays()) : null;
@@ -161,6 +173,10 @@ public class OrderService {
         }
         if (!feedbackEnabled) {
             return new ItemFeedback("NOT_AVAILABLE", false, null, null, null);
+        }
+        if (props.oneReviewPerProduct() && productReview != null) {
+            // Reordered a product they already reviewed: no new review; show the earlier one.
+            return new ItemFeedback("ALREADY_REVIEWED", false, null, productReview.getRating(), productReview.getId());
         }
         if (o.getStatus() != OrderStatus.DELIVERED) {
             return new ItemFeedback("NOT_DELIVERED", false, autoAskOn, null, null);

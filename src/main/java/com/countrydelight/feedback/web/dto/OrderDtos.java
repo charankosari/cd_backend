@@ -42,7 +42,8 @@ public final class OrderDtos {
 
     /**
      * Feedback state of one delivered item, so the orders screen can show "Rate now" or "Rated 4★".
-     * status: NOT_DELIVERED | NOT_RATED | RATED | NOT_AVAILABLE (product has no feedback)
+     * status: NOT_DELIVERED | NOT_RATED | RATED | ALREADY_REVIEWED (product reviewed on an earlier order; rating and
+     * feedbackId are that earlier review) | NOT_AVAILABLE (product has no feedback)
      */
     public record ItemFeedback(String status,
                                boolean canRateNow,

@@ -63,7 +63,10 @@ feedback:
   user-cooldown-days: 3
   # A prompt shown on this many different days with no action is treated as "ignored".
   max-impression-days: 3
-  # Don't ask about the same product again for this long after the user rated it.
+  # One review per product per household: once rated, that product is never asked about again (no card, no
+  # "Rate now"), even on later orders. Set to false to ask again after product-cooldown-after-answer-days instead.
+  one-review-per-product: true
+  # Only used when one-review-per-product is false: don't ask about the product again for this long after a rating.
   product-cooldown-after-answer-days: 30
   # Don't ask about the same product again for this long after the user skipped/ignored it.
   product-cooldown-after-skip-days: 60

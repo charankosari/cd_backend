@@ -98,8 +98,9 @@ public class PromptService {
                 customerId, PromptStatus.PENDING, PromptSource.AUTO);
         if (pendingOpt.isPresent()) {
             FeedbackPrompt pending = pendingOpt.get();
-            if (subscriptions.isSubscribed(customerId, pending.getProductId(), today)) {
-                pending.resolve(PromptStatus.CANCELLED, today, now);
+            if (subscriptions.isSubscribed(customerId, pending.getProductId(), today)
+                    || alreadyReviewed(customerId, pending.getProductId(), pending.getId())) {
+                pending.resolve(PromptStatus.CANCELLED, today, now);   // subscribed, or reviewed via "Rate now"
             } else if (isIgnored(pending, today)) {
                 // Count the cap from the last day the user actually saw it.
                 pending.resolve(PromptStatus.IGNORED, pending.getLastShownOn(), now);
@@ -172,6 +173,12 @@ public class PromptService {
         }
 
         FeedbackPrompt prompt = prompts.findByOrderItemId(orderItemId).orElse(null);
+        if (prompt != null && prompt.getStatus() == PromptStatus.ANSWERED) {
+            throw ApiException.conflict("ALREADY_RATED", "You've already rated this delivery");
+        }
+        if (alreadyReviewed(customerId, product.getId(), prompt == null ? null : prompt.getId())) {
+            throw alreadyReviewedError(product);
+        }
         if (prompt == null) {
             prompt = new FeedbackPrompt(customerId, product.getId(), item.getId(), item.getOrder().getId(),
                     item.deliveryDate(), today, today.plusDays(props.windowDays()),
@@ -199,6 +206,9 @@ public class PromptService {
             default -> {
                 // PENDING, or IGNORED but the user still had the card on screen: a late answer is still useful.
             }
+        }
+        if (alreadyReviewed(customerId, prompt.getProductId(), prompt.getId())) {
+            throw alreadyReviewedError(catalog.product(prompt.getProductId()));
         }
         LocalDate today = time.today();
         Instant now = time.now();
@@ -250,6 +260,20 @@ public class PromptService {
         }
         return new SkipResponse(promptId, PromptStatus.SKIPPED.name(),
                 "No problem. We won't ask about " + productName + " again for a while.");
+    }
+
+    /**
+     * One review per product (feedback.one-review-per-product): true if the household already rated this product
+     * through another card. Always false when the setting is off.
+     */
+    private boolean alreadyReviewed(Long customerId, String productId, Long exceptPromptId) {
+        return props.oneReviewPerProduct() && prompts.findByCustomerIdOrderByIdAsc(customerId).stream()
+                .anyMatch(p -> p.getStatus() == PromptStatus.ANSWERED && p.getProductId().equals(productId)
+                        && !p.getId().equals(exceptPromptId));
+    }
+
+    private static ApiException alreadyReviewedError(Product product) {
+        return ApiException.conflict("ALREADY_REVIEWED", "You've already reviewed " + product.getName() + ". Thanks!");
     }
 
     private FeedbackPrompt ownedPrompt(Long customerId, Long promptId) {

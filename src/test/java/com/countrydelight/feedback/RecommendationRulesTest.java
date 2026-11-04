@@ -80,15 +80,17 @@ class RecommendationRulesTest {
     }
 
     @Test
-    @DisplayName("Latest rating wins: paneer 5★ then 2★ on a later delivery -> no longer recommended")
+    @DisplayName("Reordered paneer can't be reviewed again; its first 5★ review keeps it recommended")
     void latestRatingWins() throws Exception {
+        // One review per product: a reordered paneer can't be rated again, so the first 5★ keeps it recommended.
         rate(deliver("PANEER"), 5);
-        assertThat(call(get("/api/recommendations/buy-again"), null, 200).path("items").size()).isEqualTo(1);
         time.setToday(T.plusDays(1));
-        rate(deliver("PANEER"), 2);
+        long again = deliver("PANEER");
+        JsonNode refused = call(post("/api/feedback-prompts/rate-now"), "{\"orderItemId\":" + again + "}", 409);
+        assertThat(refused.path("code").asText()).isEqualTo("ALREADY_REVIEWED");
         JsonNode rec = call(get("/api/recommendations/buy-again"), null, 200);
-        assertThat(rec.path("items").size()).isZero();
-        assertThat(rec.path("excluded").get(0).path("rating").asInt()).isEqualTo(2);
+        assertThat(rec.path("items").get(0).path("productId").asText()).isEqualTo("PANEER");
+        assertThat(rec.path("items").get(0).path("rating").asInt()).isEqualTo(5);
     }
 
     @Test

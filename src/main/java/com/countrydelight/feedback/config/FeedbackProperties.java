@@ -13,5 +13,6 @@ public record FeedbackProperties(
         @DefaultValue("60") int productCooldownAfterSkipDays,
         @DefaultValue("4") int highRatingThreshold,
         @DefaultValue("200") int noteMaxLength,
-        @DefaultValue("30") int buyAgainMaxDaysAhead) {
+        @DefaultValue("30") int buyAgainMaxDaysAhead,
+        @DefaultValue("true") boolean oneReviewPerProduct) {
 }

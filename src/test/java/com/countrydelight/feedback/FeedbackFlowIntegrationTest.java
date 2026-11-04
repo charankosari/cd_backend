@@ -160,7 +160,7 @@ class FeedbackFlowIntegrationTest {
         time.setToday(T.plusDays(3));
         assertHidden(next(C), "NOTHING_TO_ASK");
         JsonNode report = getJson(get("/api/admin/customers/" + C + "/eligibility"));
-        assertThat(report.toString()).contains("PRODUCT_RECENTLY_RATED");
+        assertThat(report.toString()).contains("PRODUCT_ALREADY_REVIEWED");   // one review per product
     }
 
     @Test
