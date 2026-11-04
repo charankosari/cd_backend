@@ -1,13 +1,16 @@
 package com.countrydelight.feedback.config;
 
+import com.countrydelight.feedback.auth.CurrentCustomerArgumentResolver;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.web.method.support.HandlerMethodArgumentResolver;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.List;
 
 @Configuration
 public class WebConfig implements WebMvcConfigurer {
@@ -22,6 +25,12 @@ public class WebConfig implements WebMvcConfigurer {
     public void addCorsMappings(CorsRegistry registry) {
         // Open CORS so the RN app (Expo web / dev servers) and a separately hosted dashboard can call us.
         registry.addMapping("/**").allowedOriginPatterns("*").allowedMethods("*").allowedHeaders("*");
+    }
+
+    /** Teaches Spring how to fill controller parameters marked @CurrentCustomer. */
+    @Override
+    public void addArgumentResolvers(List<HandlerMethodArgumentResolver> resolvers) {
+        resolvers.add(new CurrentCustomerArgumentResolver());
     }
 
     @Override

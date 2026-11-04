@@ -1,56 +1,94 @@
 ### Product feedback backend: sample calls (VS Code "REST Client" or IntelliJ HTTP client)
+### Run them top to bottom. The login call saves the token; later calls reuse it via {{token}}.
 @base = http://localhost:8081
 
-### Demo households and what each one tests
-GET {{base}}/api/admin/customers
+### ---------------------------------------------------------------- LOGIN (Kabir, 106)
 
-### --- MAIN FLOW: Kabir (106), Ghee, rate exactly 4 -> buy again
+### 1. Ask for an OTP (always 123456 for now)
+POST {{base}}/api/auth/otp/request
+Content-Type: application/json
 
-### 1. Home screen asks for a card
+{ "phone": "9000000106" }
+
+### 2. Log in with phone + OTP -> token
+# @name login
+POST {{base}}/api/auth/login
+Content-Type: application/json
+
+{ "phone": "9000000106", "otp": "123456" }
+
+### (the token from step 2, used by every call below)
+@token = {{login.response.body.accessToken}}
+
+### Who am I?
+GET {{base}}/api/auth/me
+Authorization: Bearer {{token}}
+
+### ---------------------------------------------------------------- SIGNUP (new number)
+
+POST {{base}}/api/auth/otp/request
+Content-Type: application/json
+
+{ "phone": "9876500001" }
+
+###
+POST {{base}}/api/auth/register
+Content-Type: application/json
+
+{ "phone": "9876500001", "otp": "123456", "name": "Riya", "area": "HSR Layout", "city": "Bengaluru" }
+
+### ---------------------------------------------------------------- MAIN FLOW: Ghee, rate exactly 4 -> buy again
+
+### Home screen asks for a card (note promptId)
+# @name card
 GET {{base}}/api/feedback-prompts/next
-X-Customer-Id: 106
+Authorization: Bearer {{token}}
 
-### 2. One-tap rating (use promptId from step 1)
-POST {{base}}/api/feedback-prompts/353/rating
-X-Customer-Id: 106
+### One-tap rating
+# @name rating
+POST {{base}}/api/feedback-prompts/{{card.response.body.prompt.promptId}}/rating
+Authorization: Bearer {{token}}
 Content-Type: application/json
 
 { "rating": 4 }
 
-### 3. Buy again for a picked date (use feedbackId from step 2)
+### Buy again for a picked date
 POST {{base}}/api/cart/items
-X-Customer-Id: 106
+Authorization: Bearer {{token}}
 Content-Type: application/json
 
-{ "productId": "GHEE", "quantity": 1, "deliveryDate": "2026-11-06", "feedbackId": 348 }
-
-### --- LOW RATING: Asha (101), Paneer, rate 2 -> issue details
-
-GET {{base}}/api/feedback-prompts/next
-X-Customer-Id: 101
+{ "productId": "GHEE", "quantity": 1, "feedbackId": {{rating.response.body.feedbackId}} }
 
 ###
-POST {{base}}/api/feedback-prompts/350/rating
-X-Customer-Id: 101
+GET {{base}}/api/cart
+Authorization: Bearer {{token}}
+
+### ---------------------------------------------------------------- LOW RATING (log in as Asha 9000000101 first)
+### Low rating: replace promptId / feedbackId with values from your own responses
+POST {{base}}/api/feedback-prompts/1/rating
+Authorization: Bearer {{token}}
 Content-Type: application/json
 
 { "rating": 2 }
 
 ###
-PUT {{base}}/api/feedback/349/issues
-X-Customer-Id: 101
+PUT {{base}}/api/feedback/1/issues
+Authorization: Bearer {{token}}
 Content-Type: application/json
 
 { "issueCodes": ["SMELL", "NEAR_EXPIRY"], "note": "Smelled sour when opened" }
 
-### --- SKIP: Neha (105)
-POST {{base}}/api/feedback-prompts/352/skip
-X-Customer-Id: 105
+### No token -> 401
+GET {{base}}/api/feedback-prompts/next
 
-### --- Why does (or doesn't) a household get a card?
+### ---------------------------------------------------------------- OPEN: admin / testing helpers
+
+GET {{base}}/api/admin/customers
+
+###
 GET {{base}}/api/admin/customers/104/eligibility
 
-### --- Time travel
+###
 POST {{base}}/api/admin/clock
 Content-Type: application/json
 
@@ -59,10 +97,11 @@ Content-Type: application/json
 ###
 DELETE {{base}}/api/admin/clock
 
-### Reset demo data (relative to the current simulated date)
+###
 POST {{base}}/api/admin/reset-demo-data
 
-### --- Dashboard
+### ---------------------------------------------------------------- OPEN: quality dashboard data
+
 GET {{base}}/api/dashboard/summary
 
 ###

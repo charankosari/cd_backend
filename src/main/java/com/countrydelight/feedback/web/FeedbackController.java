@@ -1,5 +1,6 @@
 package com.countrydelight.feedback.web;
 
+import com.countrydelight.feedback.auth.CurrentCustomer;
 import com.countrydelight.feedback.service.FeedbackService;
 import com.countrydelight.feedback.web.dto.FeedbackDtos.FeedbackDetailResponse;
 import com.countrydelight.feedback.web.dto.FeedbackDtos.IssueDetailsRequest;
@@ -11,13 +12,10 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
-
-import static com.countrydelight.feedback.web.FeedbackPromptController.CUSTOMER_HEADER;
 
 @RestController
 @RequestMapping("/api/feedback")
@@ -30,21 +28,21 @@ public class FeedbackController {
     }
 
     @PutMapping("/{feedbackId}/issues")
-    public FeedbackDetailResponse issues(@RequestHeader(CUSTOMER_HEADER) Long customerId,
+    public FeedbackDetailResponse issues(@CurrentCustomer Long customerId,
                                          @PathVariable Long feedbackId,
                                          @Valid @RequestBody IssueDetailsRequest body) {
         return feedback.submitIssueDetails(customerId, feedbackId, body);
     }
 
     @PostMapping(value = "/{feedbackId}/photo", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public PhotoUploadResponse photo(@RequestHeader(CUSTOMER_HEADER) Long customerId,
+    public PhotoUploadResponse photo(@CurrentCustomer Long customerId,
                                      @PathVariable Long feedbackId,
                                      @RequestPart("file") MultipartFile file) {
         return feedback.uploadPhoto(customerId, feedbackId, file);
     }
 
     @GetMapping("/{feedbackId}")
-    public FeedbackDetailResponse get(@RequestHeader(CUSTOMER_HEADER) Long customerId, @PathVariable Long feedbackId) {
+    public FeedbackDetailResponse get(@CurrentCustomer Long customerId, @PathVariable Long feedbackId) {
         return feedback.get(customerId, feedbackId);
     }
 }

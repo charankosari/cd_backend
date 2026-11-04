@@ -1,7 +1,6 @@
 package com.countrydelight.feedback;
 
 import com.countrydelight.feedback.common.TimeProvider;
-import com.countrydelight.feedback.domain.Customer;
 import com.countrydelight.feedback.domain.CustomerOrder;
 import com.countrydelight.feedback.domain.IssueOption;
 import com.countrydelight.feedback.domain.OrderItem;
@@ -30,13 +29,16 @@ import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
+import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -77,8 +79,8 @@ class FeedbackFlowIntegrationTest {
             issueOptions.save(new IssueOption("PANEER", code, code.toLowerCase(), i++));
         }
         issueOptions.save(new IssueOption("BREAD", "STALE", "Stale", 1));
-        customers.save(new Customer(C, "Test", "9000000001", "Sector 45", "Gurugram", null));
-        customers.save(new Customer(2L, "Other", "9000000002", "HSR Layout", "Bengaluru", null));
+        customers.insertWithId(C, "Test", "9000000001", "Sector 45", "Gurugram", null, Instant.now());
+        customers.insertWithId(2L, "Other", "9000000002", "HSR Layout", "Bengaluru", null, Instant.now());
     }
 
     @AfterEach
@@ -217,7 +219,7 @@ class FeedbackFlowIntegrationTest {
         assertThat(r.path("prompt").path("productId").asText()).isEqualTo("PANEER");
         long promptId = r.path("prompt").path("promptId").asLong();
 
-        JsonNode skip = getJson(post("/api/feedback-prompts/" + promptId + "/skip").header("X-Customer-Id", C));
+        JsonNode skip = getJson(post("/api/feedback-prompts/" + promptId + "/skip").with(asCustomer(C)));
         assertThat(skip.path("status").asText()).isEqualTo("SKIPPED");
         assertHidden(next(C), "FREQUENCY_CAP");
 
@@ -256,7 +258,7 @@ class FeedbackFlowIntegrationTest {
         rate(C, id, 5);
         MvcResult again = mvc.perform(ratingRequest(C, id, 3)).andReturn();
         assertThat(again.getResponse().getStatus()).isEqualTo(409);
-        MvcResult skip = mvc.perform(post("/api/feedback-prompts/" + id + "/skip").header("X-Customer-Id", C)).andReturn();
+        MvcResult skip = mvc.perform(post("/api/feedback-prompts/" + id + "/skip").with(asCustomer(C))).andReturn();
         assertThat(skip.getResponse().getStatus()).isEqualTo(409);
     }
 
@@ -346,10 +348,10 @@ class FeedbackFlowIntegrationTest {
         assertThat(body.path("orderId").asLong()).isEqualTo(item.getOrder().getId());
 
         MockMultipartFile photo = new MockMultipartFile("file", "p.jpg", "image/jpeg", new byte[]{1, 2, 3});
-        MvcResult up = mvc.perform(multipart("/api/feedback/" + feedbackId + "/photo").file(photo).header("X-Customer-Id", C)).andReturn();
+        MvcResult up = mvc.perform(multipart("/api/feedback/" + feedbackId + "/photo").file(photo).with(asCustomer(C))).andReturn();
         assertThat(up.getResponse().getStatus()).isEqualTo(200);
         MockMultipartFile pdf = new MockMultipartFile("file", "p.pdf", "application/pdf", new byte[]{1});
-        assertThat(mvc.perform(multipart("/api/feedback/" + feedbackId + "/photo").file(pdf).header("X-Customer-Id", C))
+        assertThat(mvc.perform(multipart("/api/feedback/" + feedbackId + "/photo").file(pdf).with(asCustomer(C)))
                 .andReturn().getResponse().getStatus()).isEqualTo(400);
     }
 
@@ -378,7 +380,7 @@ class FeedbackFlowIntegrationTest {
         addToCart("{\"productId\":\"PANEER\",\"deliveryDate\":\"" + T.plusDays(31) + "\"}", 400);
         addToCart("{\"productId\":\"NOPE\"}", 404);
 
-        JsonNode cart = getJson(get("/api/cart").header("X-Customer-Id", C));
+        JsonNode cart = getJson(get("/api/cart").with(asCustomer(C)));
         assertThat(cart.path("items").size()).isEqualTo(2);
         assertThat(cart.path("totalQuantity").asInt()).isEqualTo(4);
     }
@@ -419,14 +421,21 @@ class FeedbackFlowIntegrationTest {
     }
 
     @Test
-    @DisplayName("Missing customer header -> 400, unknown customer -> 404")
-    void customerHeaderRequired() throws Exception {
-        assertThat(mvc.perform(get("/api/feedback-prompts/next")).andReturn().getResponse().getStatus()).isEqualTo(400);
-        assertThat(mvc.perform(get("/api/feedback-prompts/next").header("X-Customer-Id", 999))
+    @DisplayName("No token -> 401; token for a customer that doesn't exist -> 404; dashboard is open")
+    void tokenRequired() throws Exception {
+        assertThat(mvc.perform(get("/api/feedback-prompts/next")).andReturn().getResponse().getStatus()).isEqualTo(401);
+        assertThat(mvc.perform(get("/api/cart")).andReturn().getResponse().getStatus()).isEqualTo(401);
+        assertThat(mvc.perform(get("/api/feedback-prompts/next").with(asCustomer(999)))
                 .andReturn().getResponse().getStatus()).isEqualTo(404);
+        assertThat(mvc.perform(get("/api/dashboard/summary")).andReturn().getResponse().getStatus()).isEqualTo(200);
     }
 
     // ------------------------------------------------------------------ helpers
+
+    /** Pretends the request carries a valid login token for this customer (spring-security-test). */
+    static RequestPostProcessor asCustomer(long customerId) {
+        return jwt().jwt(j -> j.subject(String.valueOf(customerId)));
+    }
 
     private void product(String id, int delay, String price) {
         products.save(new Product(id, id.charAt(0) + id.substring(1).toLowerCase(), "1 unit", new BigDecimal(price), delay, null));
@@ -445,12 +454,12 @@ class FeedbackFlowIntegrationTest {
     }
 
     private JsonNode next(long customerId) throws Exception {
-        return getJson(get("/api/feedback-prompts/next").header("X-Customer-Id", customerId));
+        return getJson(get("/api/feedback-prompts/next").with(asCustomer(customerId)));
     }
 
     private MockHttpServletRequestBuilder ratingRequest(long customerId, long promptId, int rating) {
         return post("/api/feedback-prompts/" + promptId + "/rating")
-                .header("X-Customer-Id", customerId)
+                .with(asCustomer(customerId))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"rating\":" + rating + "}");
     }
@@ -461,11 +470,11 @@ class FeedbackFlowIntegrationTest {
 
     private MvcResult putIssues(long feedbackId, String body) throws Exception {
         return mvc.perform(put("/api/feedback/" + feedbackId + "/issues")
-                .header("X-Customer-Id", C).contentType(MediaType.APPLICATION_JSON).content(body)).andReturn();
+                .with(asCustomer(C)).contentType(MediaType.APPLICATION_JSON).content(body)).andReturn();
     }
 
     private JsonNode addToCart(String body, int expectedStatus) throws Exception {
-        MvcResult r = mvc.perform(post("/api/cart/items").header("X-Customer-Id", C)
+        MvcResult r = mvc.perform(post("/api/cart/items").with(asCustomer(C))
                 .contentType(MediaType.APPLICATION_JSON).content(body)).andReturn();
         assertThat(r.getResponse().getStatus()).as(r.getResponse().getContentAsString()).isEqualTo(expectedStatus);
         return json.readTree(r.getResponse().getContentAsString());

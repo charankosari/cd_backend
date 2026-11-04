@@ -2,7 +2,7 @@
 
 Spring Boot 3 (Java 21) service that decides **when and whom to ask** for product feedback, records the
 one-tap rating, routes to **buy again** (rating 4–5) or **issue capture** (rating 1–3), and serves
-**dashboard data** for the quality team.
+**dashboard data** for the quality team. Users log in with **phone + OTP** and get a **JWT token**.
 
 The app shows only what this backend sends. The backend returns **at most one card**, and every response
 includes `nextStep` so the app knows which screen comes next.
@@ -13,20 +13,64 @@ includes `nextStep` so the app knows which screen comes next.
 
 ```bash
 cd backend
-mvn spring-boot:run              # http://localhost:8081   (PORT=xxxx to change)
-mvn test                         # 25 integration tests covering the tricky cases
+cp .env.example .env             # optional: local settings (DB, secrets, port)
+mvn spring-boot:run              # http://localhost:8081
+mvn test                         # 34 integration tests (feedback rules + login/OTP)
 ```
 
 - In-memory H2 database, seeded on every start **relative to today**, so the demo always lines up.
-- Quality dashboard page: **http://localhost:8081/dashboard.html**
 - DB console: http://localhost:8081/h2-console (JDBC URL `jdbc:h2:mem:feedback`, user `sa`)
 - Ready-made calls: [`requests.http`](requests.http) (VS Code REST Client / IntelliJ HTTP client)
 
-The logged-in household is passed as the header **`X-Customer-Id`** (stand-in for the real auth token).
+---
+
+## Configuration (.env / environment variables)
+
+`application.yml` reads every environment-specific value as `${NAME:default}`: the value of environment
+variable `NAME` if it's set, otherwise the default. Locally, put values in **`backend/.env`**
+(git-ignored; copy from [`.env.example`](.env.example)). On a server, set real environment variables;
+they take priority over `.env`.
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `PORT` | `8081` | HTTP port |
+| `DB_URL` | H2 in-memory | e.g. `jdbc:postgresql://localhost:5432/feedback` (PostgreSQL driver included) |
+| `DB_USERNAME` / `DB_PASSWORD` | `sa` / empty | DB credentials |
+| `DB_DDL_AUTO` | `create-drop` | Use `update` (or migrations + `validate`) on a real DB |
+| `SEED_ENABLED` | `true` | Demo data; set `false` on a real DB |
+| `JWT_SECRET` | dev value | **Must** be set (≥ 32 chars) anywhere real. Signs login tokens |
+| `JWT_TTL_HOURS` | `168` | Token lifetime (7 days) |
+| `OTP_FIXED_CODE` | `123456` | No SMS provider yet, so every OTP is this code. Empty = random 6-digit codes |
+| `UPLOAD_DIR` | `uploads` | Where issue photos are stored |
+
+---
+
+## Auth (login with OTP)
+
+```
+1. POST /api/auth/otp/request   {"phone":"9000000106"}
+      → {"registered": true, "otpLength": 6, "expiresInSeconds": 300, "resendAfterSeconds": 30}
+      registered=false → show the signup form; true → just the OTP box
+
+2a. Existing user:  POST /api/auth/login     {"phone":"9000000106","otp":"123456"}
+2b. New user:       POST /api/auth/register  {"phone":"98765xxxxx","otp":"123456","name":"..","area":"..","city":".."}
+      → {"accessToken":"eyJ...","tokenType":"Bearer","expiresInSeconds":604800,"newUser":false,"customer":{...}}
+
+3. Every app call:  Authorization: Bearer eyJ...
+   GET /api/auth/me → the logged-in customer
+```
+
+- **OTP:** the code is stored only as a hash, expires in 5 min and works once. After 5 wrong tries the code is locked. There's a 30 s gap between resends and at most 5 requests per hour per phone. Delivery goes through an `OtpSender` interface; today it only logs (no SMS). A real SMS provider plugs in there.
+- **Token:** a JWT signed with `JWT_SECRET` (HS256). It contains `sub` = customer id, `phone`, `role` and expiry. Editing it breaks the signature, so the server rejects it with 401.
+- **Where it's checked:** the Spring Security filter (`config/SecurityConfig`) runs **before** any controller. Controllers get the user via `@CurrentCustomer Long customerId`. Services also check that each prompt, feedback or cart item belongs to that customer (otherwise 404).
+- **Open routes (no token):** `/api/auth/otp/request|login|register`, `/api/dashboard/**` and `/api/admin/**` (quality team, deliberately open for now), `GET /api/products/**`, `/uploads/**`, `/h2-console/**`.
+- **Errors:** `401 UNAUTHORIZED` (no token), `401 INVALID_TOKEN` (expired or edited), `400 OTP_INVALID` / `OTP_EXPIRED` / `OTP_NOT_REQUESTED` / `INVALID_PHONE`, `404 NOT_REGISTERED`, `409 PHONE_ALREADY_REGISTERED`, `429 OTP_RESEND_TOO_SOON` / `OTP_LIMIT_REACHED` / `OTP_TOO_MANY_ATTEMPTS`.
 
 ---
 
 ## Demo households (seeded)
+
+Log in as any of them with phone **`9000000` + ID** (e.g. `9000000106`) and OTP **`123456`**.
 
 | ID | Name | Scenario | `GET /next` today |
 |----|------|----------|-------------------|
@@ -48,7 +92,9 @@ Koramangala, HSR Layout) with ~350 past ratings. Three quality problems are plan
 - Stale bread spike in **Indiranagar** last week
 - Sour dahi in **Koramangala**
 
-**Testing helpers** (no auth, demo only):
+New signups get IDs from 100001 upward.
+
+**Testing helpers** (open, demo only):
 
 ```
 POST   /api/admin/clock                 {"plusDays": 2}  or  {"date": "2026-11-10"}
@@ -58,6 +104,8 @@ GET    /api/admin/customers             demo households and their scenario
 GET    /api/admin/customers/{id}/eligibility   why this household does / doesn't get a card (read-only)
 PUT    /api/admin/products/{id}/feedback-delay  {"days": 3}   change X
 ```
+
+The demo clock affects feedback rules only. OTPs and tokens always use the real clock, so moving the clock never logs anyone out.
 
 ---
 
@@ -126,7 +174,7 @@ Several app loads on the same day count as **one** impression.
 
 ## API (app)
 
-All app calls need the header `X-Customer-Id: <id>`.
+All calls below need `Authorization: Bearer <accessToken>`.
 
 ### `GET /api/feedback-prompts/next`
 Call on home-screen load.
@@ -172,9 +220,10 @@ Multipart, field `file`. JPEG/PNG/WEBP/HEIC, max 5 MB → `{"feedbackId": 349, "
 - Adding the same product for the same date bumps the quantity.
 - Returns `201` with `{item, message: "Desi Cow Ghee added for tomorrow", cart}`.
 
-`GET /api/cart`, `DELETE /api/cart/items/{id}`, `GET /api/products`, `GET /api/products/{id}/issue-options`.
+`GET /api/cart`, `DELETE /api/cart/items/{id}`, `GET /api/auth/me`.
+Open: `GET /api/products`, `GET /api/products/{id}/issue-options`.
 
-## API (dashboard)
+## API (dashboard, open: quality team)
 
 Filters are optional on every endpoint: `from`, `to` (delivery dates, default last 30 days), `productId`, `area`.
 
@@ -196,6 +245,8 @@ Filters are optional on every endpoint: `from`, `to` (delivery dates, default la
 | `ISSUE_SPIKE` | An issue has ≥ 4 reports in the last 7 days and at least 2× the previous 7 days; the message names the top area | |
 | `PRODUCT_QUALITY` | A product is ≥ 30% below 4 over ≥ 10 ratings | |
 
+The dashboard UI is built by the frontend developer against these endpoints.
+
 ---
 
 ## Assumptions
@@ -210,21 +261,24 @@ Filters are optional on every endpoint: `from`, `to` (delivery dates, default la
 8. Photos are stored on local disk. In production this would be a pre-signed object-storage upload with the same API shape.
 9. Dashboard date filters use the **delivery date**, because quality traces batches by when they went out.
 10. Dashboard aggregation is done in memory over the filtered rows, which is fine for demo volumes. In production it would be SQL `GROUP BY` on a replica or warehouse.
-11. Auth is a header stub (`X-Customer-Id`). Admin endpoints are open, for demo and testing only.
+11. **Auth:** phone + OTP gives a JWT. There's no SMS provider yet, so the OTP is fixed at `123456` via config, and the real random generator is one setting away. Dashboard and admin routes are **open by decision** for the quality team. There are no refresh tokens: the token lasts 7 days, then the user logs in again. Logout = the app deletes its token.
+12. Phone numbers are Indian mobiles, stored as 10 digits (`+91` / leading `0` are stripped).
 
 ## Project layout
 
 ```
 src/main/java/com/countrydelight/feedback
+  auth/         OtpService, OtpCodeGenerator, OtpSender (+ LoggingOtpSender), TokenService, AuthService,
+                @CurrentCustomer + resolver, JsonAuthEntryPoint (401 JSON), PhoneNumbers, AuthProperties
+  config/       SecurityConfig (which routes need a token, JWT encoder/decoder), WebConfig, FeedbackProperties
+  common/       TimeProvider (demo clock), ApiException, GlobalExceptionHandler
   domain/       entities: Product, IssueOption, Customer, Subscription, CustomerOrder, OrderItem,
-                FeedbackPrompt (the "ask" + impressions), Feedback, CartItem
+                FeedbackPrompt (the "ask" + impressions), Feedback, CartItem, OtpChallenge
+  repository/   Spring Data interfaces (queries generated from method names)
   service/      EligibilityEngine  (who / what / when; pure, read-only)
                 PromptService      (card lifecycle, frequency cap, rating → next step, skip)
-                FeedbackService    (issue details, photo)   CartService   DashboardService
-  web/          controllers + dto/
+                FeedbackService (issue details, photo)  CartService  DashboardService  CustomerService (signup)
+  web/          controllers (API routes) + dto/ (request/response shapes)
   seed/         DataSeeder (demo households + dashboard history)
-src/main/resources/static/dashboard.html   quality-team dashboard page (plain HTML/JS)
-src/test/...  FeedbackFlowIntegrationTest  (25 end-to-end cases)
+src/test/...    FeedbackFlowIntegrationTest (25) · AuthFlowIntegrationTest (6) · OtpRulesTest (3)
 ```
-#   c d _ b a c k e n d  
- 

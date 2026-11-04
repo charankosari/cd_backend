@@ -5,6 +5,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.List;
@@ -22,6 +23,7 @@ public interface CustomerRepository extends JpaRepository<Customer, Long> {
      * Inserts a customer with a FIXED id (demo / test data only). Normal signups use save(),
      * which takes the id from the database sequence instead.
      */
+    @Transactional
     @Modifying
     @Query(value = "insert into customers (id, name, phone, area, city, demo_scenario, created_at) "
             + "values (:id, :name, :phone, :area, :city, :scenario, :createdAt)", nativeQuery = true)

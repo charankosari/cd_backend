@@ -107,6 +107,7 @@ public class DataSeeder implements ApplicationRunner {
     @Transactional
     public void wipe() {
         cart.deleteAllInBatch();
+        em.createQuery("delete from OtpChallenge").executeUpdate();
         feedbacks.deleteAll();
         prompts.deleteAllInBatch();
         orders.deleteAll();
@@ -268,8 +269,8 @@ public class DataSeeder implements ApplicationRunner {
         List<Customer> households = new ArrayList<>();
         for (int i = 0; i < 60; i++) {
             String[] a = AREAS[i % AREAS.length];
-            households.add(customers.save(new Customer(1001L + i, NAMES[i % NAMES.length] + " " + (char) ('A' + i / NAMES.length),
-                    "98" + String.format("%08d", 10000000 + i * 7919), a[0], a[1], null)));
+            households.add(insertCustomer(1001L + i, NAMES[i % NAMES.length] + " " + (char) ('A' + i / NAMES.length),
+                    "98" + String.format("%08d", 10000000 + i * 7919), a[0], a[1], null));
         }
         String[] productPick = {"PANEER", "PANEER", "PANEER", "DAHI", "DAHI", "DAHI", "BREAD", "BREAD",
                 "ATTA", "ATTA", "GHEE", "GHEE"};
@@ -370,8 +371,15 @@ public class DataSeeder implements ApplicationRunner {
 
     // ------------------------------------------------------------------ small builders
 
+    /** Demo households log in with phone 9000000 + id, e.g. 9000000106, and OTP 123456. */
     private Customer customer(Long id, String name, String area, String city, String scenario) {
-        return customers.save(new Customer(id, name, "9000000" + id, area, city, scenario));
+        return insertCustomer(id, name, "9000000" + id, area, city, scenario);
+    }
+
+    /** Fixed ids keep the demo scenarios stable (106 is always Kabir). Signups use the sequence instead. */
+    private Customer insertCustomer(Long id, String name, String phone, String area, String city, String scenario) {
+        customers.insertWithId(id, name, phone, area, city, scenario, time.startOf(today.minusDays(60)));
+        return customers.findById(id).orElseThrow();
     }
 
     private void subscribe(Customer c, String productId, SubscriptionStatus status, int startedDaysAgo) {
