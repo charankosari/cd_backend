@@ -9,7 +9,6 @@ public final class OrderDtos {
     private OrderDtos() {
     }
 
-    /** POST /api/orders. Body optional; deliveryDate = only order the cart lines for that date. */
     public record PlaceOrderRequest(LocalDate deliveryDate, Long addressId) {
     }
 
@@ -18,14 +17,15 @@ public final class OrderDtos {
 
     public record OrderView(Long orderId,
                             LocalDate deliveryDate,
-                            String status,          // SCHEDULED | DELIVERED | CANCELLED
+                            String status,
                             String area,
                             String city,
                             int totalQuantity,
                             BigDecimal totalAmount,
                             List<OrderItemView> items,
                             Long addressId,
-                            String deliveryAddress) {    // full address text it was / will be delivered to
+                            String deliveryAddress,
+                            java.time.Instant placedAt) {
     }
 
     public record OrderItemView(Long orderItemId,
@@ -35,19 +35,14 @@ public final class OrderDtos {
                                 int quantity,
                                 BigDecimal unitPrice,
                                 BigDecimal lineTotal,
-                                String purchaseType,   // ONE_TIME | SUBSCRIPTION
+                                String purchaseType,
                                 ItemFeedback feedback,
                                 String imageUrl) {
     }
 
-    /**
-     * Feedback state of one delivered item, so the orders screen can show "Rate now" or "Rated 4★".
-     * status: NOT_DELIVERED | NOT_RATED | RATED | ALREADY_REVIEWED (product reviewed on an earlier order; rating and
-     * feedbackId are that earlier review) | NOT_AVAILABLE (product has no feedback)
-     */
     public record ItemFeedback(String status,
                                boolean canRateNow,
-                               LocalDate autoAskOn,   // when the home-screen card would ask by itself
+                               LocalDate autoAskOn,
                                Integer rating,
                                Long feedbackId) {
     }

@@ -29,16 +29,6 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-/**
- * "Buy again": products the household liked, based on their own ratings.
- * <ul>
- *   <li>Uses the LATEST rating per product (rated 5★, later 2★ -> not recommended).</li>
- *   <li>Rating >= 4 (high-rating-threshold) -> recommended. Rating 1-3 -> left out (RATED_LOW).</li>
- *   <li>Subscribed products (active or paused) -> left out (SUBSCRIBED), as the brief says.</li>
- *   <li>Already in the cart -> left out (IN_CART).</li>
- *   <li>Only ratings from the last 90 days count.</li>
- * </ul>
- */
 @Service
 public class RecommendationService {
 
@@ -68,12 +58,6 @@ public class RecommendationService {
 
     private static final int MAX_CART_SUGGESTIONS = 4;
 
-    /**
-     * "Goes well with your cart": products that pair with what's in the cart (e.g. Bread -> Butter, Eggs, Honey).
-     * Same exclusions as buy-again: already in the cart, latest rating 1-3★, subscribed. Products the user
-     * rated 4-5★ come first. Only cart lines for tomorrow or later count. Each suggestion's date is the delivery
-     * date of the cart line it pairs with, so it arrives together.
-     */
     @Transactional(readOnly = true)
     public CartSuggestionsResponse forCart(Long customerId) {
         if (!customers.existsById(customerId)) {
@@ -91,7 +75,6 @@ public class RecommendationService {
         Map<String, Product> products = catalog.allProducts().stream()
                 .collect(Collectors.toMap(Product::getId, Function.identity()));
 
-        // Score each partner product by how many cart lines it goes with; remember the earliest such line.
         Map<String, Integer> score = new LinkedHashMap<>();
         Map<String, Integer> bestRank = new HashMap<>();
         Map<String, List<String>> pairsWith = new HashMap<>();
@@ -106,7 +89,7 @@ public class RecommendationService {
                 if (!pairsWith.get(p).contains(line.getProductId())) {
                     pairsWith.get(p).add(line.getProductId());
                 }
-                dateFor.putIfAbsent(p, line.getDeliveryDate());   // lines come in date order: earliest wins
+                dateFor.putIfAbsent(p, line.getDeliveryDate());
             }
         }
 
@@ -146,7 +129,6 @@ public class RecommendationService {
         return f != null && f.getRating() >= props.highRatingThreshold();
     }
 
-    /** Latest rating per product since a date. */
     private Map<String, Feedback> latestRatings(Long customerId, LocalDate since) {
         return feedbacks.findByCustomerId(customerId).stream()
                 .filter(f -> !f.getCreatedOn().isBefore(since))
@@ -162,7 +144,6 @@ public class RecommendationService {
         LocalDate today = time.today();
         LocalDate since = today.minusDays(LOOKBACK_DAYS);
 
-        // Latest rating per product, within the lookback window.
         Map<String, Feedback> latest = latestRatings(customerId, since);
         Set<String> inCart = cart.findByCustomerIdOrderByDeliveryDateAscIdAsc(customerId).stream()
                 .map(CartItem::getProductId).collect(Collectors.toSet());
@@ -177,7 +158,7 @@ public class RecommendationService {
                 .forEach(f -> {
                     Product p = products.get(f.getProductId());
                     if (p == null) {
-                        return;                                   // product no longer sold
+                        return;
                     }
                     if (f.getRating() < props.highRatingThreshold()) {
                         excluded.add(new ExcludedProduct(p.getId(), p.getName(), f.getRating(), "RATED_LOW"));

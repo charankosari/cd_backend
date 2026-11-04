@@ -46,14 +46,6 @@ import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 
-/**
- * Test data, generated relative to "today" so the demo always works:
- * <ul>
- *   <li>Products with X days and product-specific issue chips.</li>
- *   <li>Demo households 101-110, one per tricky scenario (see demoScenario text / README).</li>
- *   <li>~360 historical ratings across 6 areas with 3 planted quality patterns for the dashboard.</li>
- * </ul>
- */
 @Component
 public class DataSeeder implements ApplicationRunner {
 
@@ -73,7 +65,6 @@ public class DataSeeder implements ApplicationRunner {
 
     private final Map<String, Product> productMap = new LinkedHashMap<>();
     private LocalDate today;
-    /** Each customer's default (Home) address, used for their seeded orders. */
     private final Map<Long, Address> homeAddress = new java.util.HashMap<>();
 
     public DataSeeder(ProductRepository products, IssueOptionRepository issueOptions, CustomerRepository customers,
@@ -101,7 +92,6 @@ public class DataSeeder implements ApplicationRunner {
         }
     }
 
-    /** Wipes everything and seeds again relative to the current (possibly overridden) date. */
     @Transactional
     public void reseed() {
         wipe();
@@ -134,10 +124,8 @@ public class DataSeeder implements ApplicationRunner {
         log.info("Seeded demo data relative to {}: 10 demo households, {} historical ratings", today, n);
     }
 
-    // ------------------------------------------------------------------ catalog
 
     private void seedCatalog() {
-        // Images: resources/static/products/* (served at /products/*). Prices and texts are illustrative demo data.
         product("PANEER", "Fresh Paneer", "200 g", "95", 1, "paneer.jpg", "Dairy",
                 "Soft malai paneer made fresh from cow milk. Best used within 2 days.");
         product("DAHI", "Fresh Dahi", "400 g", "45", 1, "dahi.jpg", "Dairy",
@@ -148,12 +136,9 @@ public class DataSeeder implements ApplicationRunner {
                 "Stone-ground whole wheat flour for soft rotis.");
         product("GHEE", "Desi Cow Ghee", "500 ml", "375", 7, "ghee.jpg", "Dairy",
                 "Slow-cooked from cow milk butter, with a rich aroma.");
-        // Mostly bought on subscription; no X configured, so we never ask (shows FEEDBACK_NOT_CONFIGURED).
         product("MILK", "Cow Milk", "500 ml", "34", null, "milk.png", "Dairy",
                 "Fresh cow milk, delivered every morning.");
-        // Atta and honey are bought once in a while, not on a daily plan.
         productMap.get("ATTA").setSubscribable(false);
-        // Extra catalog products (each with its own X and issue chips).
         product("BUTTER", "White Butter", "100 g", "60", 3, "butter.png", "Dairy",
                 "Unsalted white butter churned from cow milk cream.");
         product("EGGS", "Farm Eggs", "6 pcs", "72", 2, "eggs.png", "Eggs",
@@ -199,15 +184,12 @@ public class DataSeeder implements ApplicationRunner {
         }
     }
 
-    // ------------------------------------------------------------------ demo households (one per scenario)
 
     private void seedDemoHouseholds() {
-        // 101: first-ever order, paneer yesterday -> paneer card with NEW_TO_HOUSEHOLD + FIRST_TIME_CUSTOMER.
         Customer asha = customer(101L, "Asha", "Sector 45", "Gurugram",
                 "First-time customer. Paneer delivered yesterday (X=1) -> Paneer card shows today.");
         oneTime(asha, 1, "PANEER", 1);
 
-        // 102: subscribed to Dahi, plus a one-time extra Dahi -> never asked.
         Customer rohan = customer(102L, "Rohan", "HSR Layout", "Bengaluru",
                 "Subscribed to Dahi + Milk. Also bought one extra Dahi yesterday -> no card (subscribed product).");
         subscribe(rohan, "DAHI", SubscriptionStatus.ACTIVE, 60, 1, SubscriptionFrequency.DAILY);
@@ -222,21 +204,18 @@ public class DataSeeder implements ApplicationRunner {
             orders.save(o);
         }
 
-        // 103: bought paneer twice before rating -> ONE card, about the latest delivery.
         Customer meera = customer(103L, "Meera", "Indiranagar", "Bengaluru",
                 "Bought Paneer 3 days ago and again yesterday, never rated -> one card about yesterday's Paneer.");
         oneTime(meera, 20, "MILK", 1);
         oneTime(meera, 3, "PANEER", 1);
         oneTime(meera, 1, "PANEER", 2);
 
-        // 104: rated Dahi yesterday -> frequency cap blocks the Ghee that is due today.
         Customer vikram = customer(104L, "Vikram", "DLF Phase 3", "Gurugram",
                 "Rated Dahi yesterday. Ghee is due today but frequency cap (3 days) holds it -> no card until today+2.");
         OrderItem vikramDahi = oneTime(vikram, 3, "DAHI", 1);
         answeredHistory(vikram, vikramDahi, 2, 1, 5, Set.of(), null);
         oneTime(vikram, 7, "GHEE", 1);
 
-        // 105: skipped Atta before -> new Atta not asked; Bread asked instead.
         Customer neha = customer(105L, "Neha", "Koramangala", "Bengaluru",
                 "Skipped the Atta card 4 days ago. New Atta is due today but suppressed -> Bread card shows instead.");
         OrderItem nehaAtta = oneTime(neha, 10, "ATTA", 1);
@@ -246,24 +225,20 @@ public class DataSeeder implements ApplicationRunner {
         oneTime(neha, 5, "ATTA", 1);
         oneTime(neha, 2, "BREAD", 1);
 
-        // 106: first-time Ghee due today -> use it to test "rating exactly 4" -> buy again.
         Customer kabir = customer(106L, "Kabir", "Sohna Road", "Gurugram",
                 "Ghee delivered 7 days ago (X=7) -> Ghee card today. Rate it exactly 4 to see the buy-again flow.");
         oneTime(kabir, 7, "GHEE", 1);
 
-        // 107: Atta not due yet.
         Customer ananya = customer(107L, "Ananya", "HSR Layout", "Bengaluru",
                 "Atta delivered 2 days ago (X=5) -> nothing yet. Move the clock +3 days to see the card.");
         oneTime(ananya, 2, "ATTA", 1);
 
-        // 108: two products due: repeat Bread vs brand-new Ghee -> Ghee wins (new to household).
         Customer priya = customer(108L, "Priya", "Indiranagar", "Bengaluru",
                 "Bread (bought before) and Ghee (first time) both due today -> Ghee is asked first.");
         oneTime(priya, 30, "BREAD", 1);
         oneTime(priya, 2, "BREAD", 1);
         oneTime(priya, 7, "GHEE", 1);
 
-        // 109: ignored a Paneer card for 3 days -> marked IGNORED today, cap kicks in.
         Customer arjun = customer(109L, "Arjun", "Sector 45", "Gurugram",
                 "Saw a Paneer card on 3 days and never tapped -> becomes IGNORED today; Dahi waits for the cap.");
         OrderItem arjunPaneer = oneTime(arjun, 4, "PANEER", 1);
@@ -273,7 +248,6 @@ public class DataSeeder implements ApplicationRunner {
         prompts.save(ignoredSoon);
         oneTime(arjun, 1, "DAHI", 1);
 
-        // 110: paused Ghee subscription counts as subscribed.
         Customer sara = customer(110L, "Sara", "DLF Phase 3", "Gurugram",
                 "Ghee subscription is PAUSED and she bought one Ghee jar 7 days ago -> no card (still a subscriber).");
         subscribe(sara, "GHEE", SubscriptionStatus.PAUSED, 90, 1, SubscriptionFrequency.ALTERNATE_DAYS);
@@ -282,13 +256,7 @@ public class DataSeeder implements ApplicationRunner {
         seedPresentationAccounts();
     }
 
-    /**
-     * Three easy-to-explain test accounts for the demo (phone 9000000 + id, OTP 123456).
-     * 201 = subscriber (never asked), 202 = happy customer (gets buy-again), 203 = unhappy customer (low-rated
-     * products are not recommended).
-     */
     private void seedPresentationAccounts() {
-        // 201 Ravi: subscriber. Never asked for feedback on subscribed products, and they're never recommended.
         Customer ravi = customer(201L, "Ravi", "Sector 45", "Gurugram",
                 "SUBSCRIBER. Subscribed to Milk, Dahi and Paneer. Got a one-time Paneer extra yesterday -> no feedback "
                         + "card. He rated Paneer 5★ before subscribing, but buy-again leaves it out (SUBSCRIBED).");
@@ -303,12 +271,11 @@ public class DataSeeder implements ApplicationRunner {
             item(o, "DAHI", 1, PurchaseType.SUBSCRIPTION);
             item(o, "PANEER", 1, PurchaseType.SUBSCRIPTION);
             if (d == 1) {
-                item(o, "PANEER", 1, PurchaseType.ONE_TIME);     // extra one-time paneer: still not asked
+                item(o, "PANEER", 1, PurchaseType.ONE_TIME);
             }
             orders.save(o);
         }
 
-        // 202 Anjali: happy customer. Rated Ghee 5★ and Paneer 4★ -> both recommended to buy again.
         Customer anjali = customer(202L, "Anjali", "Indiranagar", "Bengaluru",
                 "HAPPY CUSTOMER. Rated Ghee 5★ and Paneer 4★ -> buy-again recommends both. Dahi delivered yesterday "
                         + "-> Dahi feedback card shows today.");
@@ -318,7 +285,6 @@ public class DataSeeder implements ApplicationRunner {
         answeredHistory(anjali, anjaliPaneer, 6, 6, 4, Set.of(), null);
         oneTime(anjali, 1, "DAHI", 1);
 
-        // 203 Karan: unhappy with some products. Bread 2★, Atta 3★ -> NOT recommended. Eggs 5★ -> recommended.
         Customer karan = customer(203L, "Karan", "HSR Layout", "Bengaluru",
                 "MIXED RATINGS. Bread 2★ (stale) and Atta 3★ (lumpy) are NOT recommended; Eggs 5★ is. Coconut water "
                         + "delivered yesterday -> its feedback card shows today.");
@@ -330,7 +296,6 @@ public class DataSeeder implements ApplicationRunner {
         answeredHistory(karan, karanEggs, 4, 4, 5, Set.of(), null);
         oneTime(karan, 1, "COCONUT_WATER", 1);
 
-        // 204 Pooja: subscribed to Dahi (and Milk) but ordered Paneer once -> asked about Paneer only, never Dahi.
         Customer pooja = customer(204L, "Pooja", "Koramangala", "Bengaluru",
                 "SUBSCRIBED + ORDERED. Subscribed to Dahi and Milk. Yesterday she also got Paneer (one-time, not "
                         + "subscribed) and an extra Dahi (one-time) -> card asks about Paneer only; Dahi is never asked.");
@@ -341,14 +306,13 @@ public class DataSeeder implements ApplicationRunner {
             item(o, "MILK", 1, PurchaseType.SUBSCRIPTION);
             item(o, "DAHI", 1, PurchaseType.SUBSCRIPTION);
             if (d == 1) {
-                item(o, "PANEER", 1, PurchaseType.ONE_TIME);   // not subscribed -> asked
-                item(o, "DAHI", 1, PurchaseType.ONE_TIME);     // subscribed product, even bought once -> not asked
+                item(o, "PANEER", 1, PurchaseType.ONE_TIME);
+                item(o, "DAHI", 1, PurchaseType.ONE_TIME);
             }
             orders.save(o);
         }
     }
 
-    // ------------------------------------------------------------------ history for the dashboard
 
     private static final String[][] AREAS = {
             {"Sector 45", "Gurugram"}, {"DLF Phase 3", "Gurugram"}, {"Sohna Road", "Gurugram"},
@@ -389,17 +353,16 @@ public class DataSeeder implements ApplicationRunner {
                 continue;
             }
 
-            // Planted patterns the dashboard should surface:
             double lowProb = 0.12;
             Map<String, Integer> issueWeights = defaultIssueWeights(pid);
             if (pid.equals("PANEER") && c.getArea().equals("Sector 45")) {
-                lowProb = 0.6;          // HOTSPOT: paneer smell / near-expiry in Sector 45
+                lowProb = 0.6;
                 issueWeights = Map.of("SMELL", 6, "NEAR_EXPIRY", 3, "SOUR", 1);
             } else if (pid.equals("BREAD") && c.getArea().equals("Indiranagar") && daysAgo <= 9) {
-                lowProb = 0.75;         // ISSUE_SPIKE: stale bread in Indiranagar, last week only
+                lowProb = 0.75;
                 issueWeights = Map.of("STALE", 8, "HARD", 2);
             } else if (pid.equals("DAHI") && c.getArea().equals("Koramangala")) {
-                lowProb = 0.45;         // HOTSPOT: sour dahi in Koramangala
+                lowProb = 0.45;
                 issueWeights = Map.of("TOO_SOUR", 7, "WATERY", 2, "OTHER", 1);
             }
 
@@ -407,7 +370,7 @@ public class DataSeeder implements ApplicationRunner {
             int rating = low ? 1 + rnd.nextInt(3) : (rnd.nextDouble() < 0.6 ? 5 : 4);
             Set<String> issues = new LinkedHashSet<>();
             String note = null;
-            if (low && rnd.nextDouble() < 0.9) {    // ~10% of low raters abandon the details step
+            if (low && rnd.nextDouble() < 0.9) {
                 issues.add(weightedPick(issueWeights, rnd));
                 if (rnd.nextDouble() < 0.25) {
                     issues.add(weightedPick(defaultIssueWeights(pid), rnd));
@@ -431,11 +394,10 @@ public class DataSeeder implements ApplicationRunner {
             created++;
         }
 
-        // ISSUE_SPIKE, made explicit: a bad bread batch in Indiranagar during the last week.
         List<Customer> indiranagar = households.stream().filter(c -> c.getArea().equals("Indiranagar")).toList();
         for (int k = 0; k < 7; k++) {
             Customer c = indiranagar.get(k % indiranagar.size());
-            int daysAgo = 3 + (k % 5);   // delivered 3..7 days ago, so X=2 has passed
+            int daysAgo = 3 + (k % 5);
             CustomerOrder o = order(c, daysAgo);
             OrderItem item = item(o, "BREAD", 1, PurchaseType.ONE_TIME);
             orders.save(o);
@@ -459,7 +421,7 @@ public class DataSeeder implements ApplicationRunner {
 
     private static String weightedPick(Map<String, Integer> weights, Random rnd) {
         List<String> keys = new ArrayList<>(weights.keySet());
-        keys.sort(String::compareTo);      // Map.of iteration order is unspecified; sort for repeatable seeds
+        keys.sort(String::compareTo);
         int total = weights.values().stream().mapToInt(Integer::intValue).sum();
         int r = rnd.nextInt(total);
         for (String k : keys) {
@@ -471,29 +433,24 @@ public class DataSeeder implements ApplicationRunner {
         return keys.get(keys.size() - 1);
     }
 
-    // ------------------------------------------------------------------ small builders
 
-    /** Demo households log in with phone 9000000 + id, e.g. 9000000106, and OTP 123456. */
     private Customer customer(Long id, String name, String area, String city, String scenario) {
         Customer c = insertCustomer(id, name, "9000000" + id, area, city, scenario);
-        addAddressBook(c, id % 2 == 0 ? 5 : 4);      // demo accounts: 4-5 addresses
+        addAddressBook(c, id % 2 == 0 ? 5 : 4);
         return c;
     }
 
-    /** Fixed ids keep the demo scenarios stable (106 is always Kabir). Signups use the sequence instead. */
     private Customer insertCustomer(Long id, String name, String phone, String area, String city, String scenario) {
         customers.insertWithId(id, name, phone, area, city, scenario, time.startOf(today.minusDays(60)));
         Customer c = customers.findById(id).orElseThrow();
-        addHome(c);                                    // everyone has a default Home address
+        addHome(c);
         return c;
     }
 
-    // ------------------------------------------------------------------ addresses
 
     private record Place(String area, String pincode, String street, String landmark) {
     }
 
-    /** Real area names and pincodes; streets and landmarks are illustrative. */
     private static final Map<String, List<Place>> PLACES = Map.of(
             "Gurugram", List.of(
                     new Place("Sector 45", "122003", "Huda Market Road", "Sector 45 Community Centre"),
@@ -531,7 +488,6 @@ public class DataSeeder implements ApplicationRunner {
         homeAddress.put(id, home);
     }
 
-    /** Home + (total - 1) more addresses in other areas of the same city. */
     private void addAddressBook(Customer c, int total) {
         List<Place> others = PLACES.getOrDefault(c.getCity(), List.of()).stream()
                 .filter(p -> !p.area().equals(c.getArea())).toList();
@@ -550,10 +506,6 @@ public class DataSeeder implements ApplicationRunner {
         return n + (n == 1 ? "st" : n == 2 ? "nd" : n == 3 ? "rd" : "th");
     }
 
-    /**
-     * A plan that has been running for a while. Its past deliveries are seeded as orders up to yesterday;
-     * today's delivery onwards is created by SubscriptionDeliveryService (lastGeneratedOn = yesterday).
-     */
     private void subscribe(Customer c, String productId, SubscriptionStatus status, int startedDaysAgo, int quantity,
                            SubscriptionFrequency frequency) {
         Subscription s = new Subscription(c.getId(), productId, status, today.minusDays(startedDaysAgo), null);
@@ -567,7 +519,7 @@ public class DataSeeder implements ApplicationRunner {
         CustomerOrder o = new CustomerOrder(c.getId(), today.minusDays(daysAgo), OrderStatus.DELIVERED, c.getArea(), c.getCity());
         Address home = homeAddress.get(c.getId());
         if (home != null) {
-            o.deliverTo(home);                         // seeded orders go to the Home address
+            o.deliverTo(home);
         }
         return o;
     }
@@ -583,7 +535,6 @@ public class DataSeeder implements ApplicationRunner {
         return item;
     }
 
-    /** A prompt first shown {@code shownDaysAgo} days ago, still PENDING. */
     private FeedbackPrompt prompt(Customer c, OrderItem item, int shownDaysAgo) {
         Product p = productMap.get(item.getProductId());
         LocalDate due = item.deliveryDate().plusDays(p.getFeedbackDelayDays());

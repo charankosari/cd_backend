@@ -25,11 +25,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
-/**
- * Stand-in for the real subscription scheduler: creates the morning delivery for every subscription delivery day
- * up to today, as DELIVERED orders with SUBSCRIPTION items (one order per household per day, grouped by address).
- * Runs before we read orders or decide on feedback, so it follows the demo clock too.
- */
 @Service
 public class SubscriptionDeliveryService {
 
@@ -51,13 +46,11 @@ public class SubscriptionDeliveryService {
         this.time = time;
     }
 
-    /** Create any missing subscription deliveries for one household, up to today. Returns orders created. */
     @Transactional
     public int generateFor(Long customerId) {
         return generate(subscriptions.findByCustomerIdAndStatus(customerId, SubscriptionStatus.ACTIVE));
     }
 
-    /** Same, for every household (dashboard). */
     @Transactional
     public int generateAll() {
         return generate(subscriptions.findByStatus(SubscriptionStatus.ACTIVE));
@@ -81,7 +74,6 @@ public class SubscriptionDeliveryService {
                 List<Subscription> due = subs.stream()
                         .filter(s -> !s.generateFrom(today).isAfter(d) && s.deliversOn(d))
                         .toList();
-                // One order per address per day (a household might send one plan to work, another home).
                 Map<Long, List<Subscription>> byAddress = due.stream()
                         .collect(Collectors.groupingBy(s -> Objects.requireNonNullElse(s.getAddressId(), -1L)));
                 for (List<Subscription> group : byAddress.values()) {

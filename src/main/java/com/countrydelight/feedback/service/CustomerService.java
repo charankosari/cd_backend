@@ -12,7 +12,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.util.Optional;
 
-/** Creating and reading households (users). */
 @Service
 public class CustomerService {
 
@@ -24,10 +23,6 @@ public class CustomerService {
         this.addresses = addresses;
     }
 
-    /**
-     * Creates a new household, plus a default "Home" address from the signup area/city (the user can complete
-     * it later in the address book). The phone must already be normalised and OTP-verified by the caller.
-     */
     @Transactional
     public Customer create(String phone, String name, String area, String city) {
         if (customers.existsByPhone(phone)) {
@@ -35,8 +30,6 @@ public class CustomerService {
         }
         Customer created;
         try {
-            // saveAndFlush = INSERT now, so a duplicate phone (two signups at the same moment)
-            // fails here, inside the try, instead of later at commit.
             created = customers.saveAndFlush(new Customer(name.trim(), phone, area.trim(), city.trim(), Instant.now()));
         } catch (DataIntegrityViolationException e) {
             throw ApiException.conflict("PHONE_ALREADY_REGISTERED", "This number already has an account. Log in instead");

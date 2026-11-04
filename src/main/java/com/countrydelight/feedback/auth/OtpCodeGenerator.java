@@ -19,8 +19,8 @@ public class OtpCodeGenerator {
         if (config.usesFixedCode()) {
             return config.fixedCode();
         }
-        int bound = (int) Math.pow(10, config.length());          // 6 digits -> 1,000,000
-        int n = random.nextInt(bound);                             // 0 .. 999999
-        return String.format("%0" + config.length() + "d", n);    // keep leading zeros: 004213
+        int bound = (int) Math.pow(10, config.length());
+        int n = random.nextInt(bound);
+        return String.format("%0" + config.length() + "d", n);
     }
 }

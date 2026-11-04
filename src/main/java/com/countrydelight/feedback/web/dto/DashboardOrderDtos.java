@@ -5,19 +5,17 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 
-/** Orders screen of the quality/ops dashboard. */
 public final class DashboardOrderDtos {
 
     private DashboardOrderDtos() {
     }
 
-    /** GET /api/dashboard/orders */
     public record OrdersPage(List<OrderRow> content,
                              int page,
                              int size,
                              long totalElements,
                              int totalPages,
-                             Map<String, Long> counts) {   // SCHEDULED / DELIVERED / CANCELLED / ALL
+                             Map<String, Long> counts) {
     }
 
     public record OrderRow(Long orderId,
@@ -26,12 +24,14 @@ public final class DashboardOrderDtos {
                            String area,
                            String city,
                            LocalDate deliveryDate,
-                           String status,                // SCHEDULED | DELIVERED | CANCELLED
-                           boolean canMarkDelivered,     // true -> show the "Mark delivered" button
+                           String status,
+                           boolean canMarkDelivered,
                            int totalQuantity,
                            BigDecimal totalAmount,
                            List<OrderLine> items,
-                           String deliveryAddress) {
+                           String deliveryAddress,
+                           String orderType,
+                           java.time.Instant placedAt) {
     }
 
     public record OrderLine(Long orderItemId,
@@ -40,15 +40,35 @@ public final class DashboardOrderDtos {
                             String unit,
                             int quantity,
                             BigDecimal lineTotal,
-                            String purchaseType,          // ONE_TIME | SUBSCRIPTION
+                            String purchaseType,
                             String imageUrl) {
     }
 
-    /** POST /api/dashboard/orders/{orderId}/deliver */
     public record DeliverResponse(OrderRow order, String message) {
     }
 
-    /** GET /api/dashboard/carts: what customers have in their carts right now (not yet ordered). */
+    public record SubscriptionsPage(List<SubscriptionRow> content,
+                                    Map<String, Long> counts,
+                                    BigDecimal activeMonthlyValue) {
+    }
+
+    public record SubscriptionRow(Long subscriptionId,
+                                  Long customerId,
+                                  String customerName,
+                                  String productId,
+                                  String productName,
+                                  String unit,
+                                  String imageUrl,
+                                  int quantity,
+                                  String frequency,
+                                  String status,
+                                  LocalDate startDate,
+                                  LocalDate nextDeliveryDate,
+                                  LocalDate endDate,
+                                  String deliveryAddress,
+                                  BigDecimal estimatedMonthlyCost) {
+    }
+
     public record CartsOverview(List<CustomerCart> carts,
                                 int customers,
                                 int lines,
@@ -73,7 +93,7 @@ public final class DashboardOrderDtos {
                            int quantity,
                            BigDecimal lineTotal,
                            LocalDate deliveryDate,
-                           String source,          // MANUAL | FEEDBACK_BUY_AGAIN (added from the buy-again nudge)
+                           String source,
                            String imageUrl) {
     }
 }

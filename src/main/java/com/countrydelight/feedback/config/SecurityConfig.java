@@ -36,7 +36,7 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .cors(Customizer.withDefaults())
-                .headers(h -> h.frameOptions(f -> f.sameOrigin()))   // lets the H2 console page render
+                .headers(h -> h.frameOptions(f -> f.sameOrigin()))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(antMatcher(HttpMethod.POST, "/api/auth/otp/request")).permitAll()
                         .requestMatchers(antMatcher(HttpMethod.POST, "/api/auth/login")).permitAll()
@@ -45,7 +45,7 @@ public class SecurityConfig {
                         .requestMatchers(antMatcher("/api/admin/**")).permitAll()
                         .requestMatchers(antMatcher(HttpMethod.GET, "/api/products/**")).permitAll()
                         .requestMatchers(antMatcher("/uploads/**")).permitAll()
-                        .requestMatchers(antMatcher(HttpMethod.GET, "/products/**")).permitAll()   // product images
+                        .requestMatchers(antMatcher(HttpMethod.GET, "/products/**")).permitAll()
                         .requestMatchers(antMatcher("/dashboard.html")).permitAll()
                         .requestMatchers(antMatcher("/h2-console/**")).permitAll()
                         .requestMatchers(antMatcher("/error")).permitAll()

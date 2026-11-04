@@ -18,7 +18,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
-/** The logged-in household's subscriptions. */
 @RestController
 @RequestMapping("/api/subscriptions")
 public class SubscriptionController {
@@ -56,7 +55,6 @@ public class SubscriptionController {
         return subscriptions.resume(customerId, subscriptionId);
     }
 
-    /** Cancel (kept in the list as CANCELLED). */
     @DeleteMapping("/{subscriptionId}")
     public SubscriptionView cancel(@CurrentCustomer Long customerId, @PathVariable Long subscriptionId) {
         return subscriptions.cancel(customerId, subscriptionId);

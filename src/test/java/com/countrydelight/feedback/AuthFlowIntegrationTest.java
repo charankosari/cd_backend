@@ -22,10 +22,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 
-/**
- * Real login flow, no shortcuts: request OTP, login or register, then use the returned token.
- * The resend cooldown is 0 here so tests can request several codes; OtpCooldownTest covers the cooldown.
- */
 @SpringBootTest(properties = {"app.seed.enabled=false", "app.auth.otp.resend-cooldown-seconds=0"})
 @AutoConfigureMockMvc
 class AuthFlowIntegrationTest {
@@ -127,7 +123,6 @@ class AuthFlowIntegrationTest {
         String token = call(post("/api/auth/login"), "{\"phone\":\"" + EXISTING + "\",\"otp\":\"123456\"}", 200)
                 .path("accessToken").asText();
 
-        // Swap the payload's "sub" (customer id) from 1 to 2, keep the original signature.
         String[] parts = token.split("\\.");
         String payload = new String(Base64.getUrlDecoder().decode(parts[1]), StandardCharsets.UTF_8)
                 .replace("\"sub\":\"1\"", "\"sub\":\"2\"");
@@ -139,7 +134,6 @@ class AuthFlowIntegrationTest {
         authed(get("/api/cart"), "not-a-token", 401);
     }
 
-    // ------------------------------------------------------------------ helpers
 
     private JsonNode call(org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder req,
                           String body, int expected) throws Exception {

@@ -33,7 +33,6 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 
-/** Once a household reviewed a product, later orders of that product get no review option. */
 @SpringBootTest(properties = {"app.seed.enabled=false"})
 @AutoConfigureMockMvc
 class OneReviewPerProductTest {
@@ -70,7 +69,7 @@ class OneReviewPerProductTest {
         long promptId = call(get("/api/feedback-prompts/next"), null, 200).path("prompt").path("promptId").asLong();
         call(post("/api/feedback-prompts/" + promptId + "/rating"), "{\"rating\":4}", 200);
 
-        time.setToday(T.plusDays(60));                                    // long after any cooldown
+        time.setToday(T.plusDays(60));
         long again = deliver(1, "PANEER");
         JsonNode next = call(get("/api/feedback-prompts/next"), null, 200);
         assertThat(next.path("show").asBoolean()).isFalse();
@@ -88,7 +87,7 @@ class OneReviewPerProductTest {
     @Test
     @DisplayName("Reviewed via Rate now: the waiting home card for the same product is withdrawn and can't be rated")
     void rateNowWithdrawsTheHomeCard() throws Exception {
-        deliver(1, "PANEER");                                             // due today -> home card
+        deliver(1, "PANEER");
         long other = deliver(2, "PANEER");
         long homeCard = call(get("/api/feedback-prompts/next"), null, 200).path("prompt").path("promptId").asLong();
 
@@ -116,7 +115,6 @@ class OneReviewPerProductTest {
         call(post("/api/feedback-prompts/rate-now"), "{\"orderItemId\":" + dahi + "}", 200);
     }
 
-    // ------------------------------------------------------------------ helpers
 
     private long deliver(int daysAgo, String productId) {
         CustomerOrder o = new CustomerOrder(C, time.today().minusDays(daysAgo), OrderStatus.DELIVERED, "Sector 45", "Gurugram");

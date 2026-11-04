@@ -14,7 +14,6 @@ public final class SubscriptionDtos {
     private SubscriptionDtos() {
     }
 
-    /** POST /api/subscriptions. Defaults: quantity 1, DAILY, start tomorrow, default address. */
     public record SubscribeRequest(@NotBlank String productId,
                                    @Min(1) @Max(10) Integer quantity,
                                    SubscriptionFrequency frequency,
@@ -22,7 +21,6 @@ public final class SubscriptionDtos {
                                    Long addressId) {
     }
 
-    /** PATCH /api/subscriptions/{id}: send any of these. Applies from the next delivery. */
     public record UpdateSubscriptionRequest(@Min(1) @Max(10) Integer quantity,
                                             SubscriptionFrequency frequency,
                                             Long addressId) {
@@ -35,11 +33,11 @@ public final class SubscriptionDtos {
                                    BigDecimal price,
                                    String imageUrl,
                                    int quantity,
-                                   String frequency,             // DAILY | ALTERNATE_DAYS
-                                   String status,                // ACTIVE | PAUSED | CANCELLED
+                                   String frequency,
+                                   String status,
                                    LocalDate startDate,
-                                   LocalDate nextDeliveryDate,   // null when paused / cancelled
-                                   LocalDate endDate,            // set when cancelled
+                                   LocalDate nextDeliveryDate,
+                                   LocalDate endDate,
                                    Long addressId,
                                    String deliveryAddress,
                                    BigDecimal estimatedMonthlyCost,

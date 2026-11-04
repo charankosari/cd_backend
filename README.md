@@ -286,7 +286,7 @@ already in the cart (`IN_CART`). Ratings from the last 90 days. The `excluded` l
 ### Orders
 - `POST /api/orders` (body optional: `{"deliveryDate": "..."}`): checkout. Cart lines become one `SCHEDULED` order per delivery date, and the cart is emptied.
 - An order becomes `DELIVERED` automatically on its delivery date (a stand-in for the delivery system; it follows the demo clock). From then on, the normal X-day feedback rules apply to it.
-- `GET /api/orders`, `GET /api/orders/{id}`: newest first. Each item has `feedback: {status, canRateNow, autoAskOn, rating?, feedbackId?}`.
+- `GET /api/orders`, `GET /api/orders/{id}`: newest first (by `placedAt`). Each item has `feedback: {status, canRateNow, autoAskOn, rating?, feedbackId?}`.
 
 ### Rate now (skip the X-day wait)
 `POST /api/feedback-prompts/rate-now` `{"orderItemId": 873}` returns the same card as `/next`, for a delivered item,
@@ -317,10 +317,15 @@ Filters are optional on every endpoint: `from`, `to` (delivery dates, default la
   - `alerts`: the patterns below
 - `GET /api/dashboard/feedback?issueCode=&maxRating=&page=&size=`: individual rows for tracing (order id, delivery date, area, note, photo).
 - `GET /api/dashboard/filters`: products with their chips, and areas.
-- `GET /api/dashboard/orders?status=SCHEDULED|DELIVERED|CANCELLED|ALL&page=&size=`: every customer's orders (customer name,
-  area, items, total, `canMarkDelivered`) plus `counts` per status. To-deliver orders come soonest first.
+- `GET /api/dashboard/orders?status=SCHEDULED|DELIVERED|CANCELLED|ALL&type=ONE_TIME|SUBSCRIPTION&page=&size=`: every
+  customer's orders, **newest first** (`placedAt`), with customer name, address, items, total, `orderType`
+  (`ONE_TIME|SUBSCRIPTION|MIXED`), `canMarkDelivered`, plus `counts` per status and per type (`ONE_TIME` / `SUBSCRIPTION`
+  count orders that contain such a line, so a mixed order is in both).
+- `GET /api/dashboard/subscriptions?status=ACTIVE|PAUSED|CANCELLED|ALL&productId=`: every customer's subscriptions, newest
+  first (customer, product, quantity, frequency, next delivery, address, estimated monthly cost), `counts` per status and
+  `activeMonthlyValue`. `400 BAD_STATUS` for an unknown status.
 - `GET /api/dashboard/carts`: live carts (lines for tomorrow or later) grouped by customer, with totals; buy-again lines
-  are marked `FEEDBACK_BUY_AGAIN`.
+  are marked `FEEDBACK_BUY_AGAIN`. The most recently active cart comes first, and each cart's newest line first.
 - `POST /api/dashboard/orders/{orderId}/deliver`: **Mark delivered**. Delivers a scheduled order now; if it was planned for a
   later day, its delivery date becomes today, so the X-day feedback wait starts today and "Rate now" works at once.
   `409 ALREADY_DELIVERED` / `ORDER_CANCELLED`, `404` unknown order.

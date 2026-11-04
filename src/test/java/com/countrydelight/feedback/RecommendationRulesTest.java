@@ -35,7 +35,6 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 
-/** Buy-again rules: >= 4★ recommended, latest rating wins, subscribed / in-cart / low-rated left out. */
 @SpringBootTest(properties = {"app.seed.enabled=false"})
 @AutoConfigureMockMvc
 class RecommendationRulesTest {
@@ -82,7 +81,6 @@ class RecommendationRulesTest {
     @Test
     @DisplayName("Reordered paneer can't be reviewed again; its first 5★ review keeps it recommended")
     void latestRatingWins() throws Exception {
-        // One review per product: a reordered paneer can't be rated again, so the first 5★ keeps it recommended.
         rate(deliver("PANEER"), 5);
         time.setToday(T.plusDays(1));
         long again = deliver("PANEER");
@@ -106,7 +104,6 @@ class RecommendationRulesTest {
         assertThat(rec.path("excluded").toString()).contains("SUBSCRIBED").contains("IN_CART");
     }
 
-    // ------------------------------------------------------------------ helpers
 
     private long deliver(String productId) {
         CustomerOrder o = new CustomerOrder(C, time.today().minusDays(1), OrderStatus.DELIVERED, "Sector 45", "Gurugram");
@@ -115,7 +112,6 @@ class RecommendationRulesTest {
         return o.getItems().get(0).getId();
     }
 
-    /** Rates an item via "Rate now" (no waiting); returns the feedbackId. */
     private long rate(long orderItemId, int stars) throws Exception {
         long promptId = call(post("/api/feedback-prompts/rate-now"), "{\"orderItemId\":" + orderItemId + "}", 200)
                 .path("prompt").path("promptId").asLong();

@@ -74,7 +74,6 @@ public final class DashboardDtos {
     public record TrendPoint(LocalDate date, long count, long lowCount, double avgRating) {
     }
 
-    /** A pattern the quality team should look at. type: HOTSPOT, ISSUE_SPIKE, PRODUCT_QUALITY. */
     public record Alert(String type,
                         String severity,
                         String productId,
@@ -98,13 +97,12 @@ public final class DashboardDtos {
                               String area,
                               String city,
                               Long customerId,
-                              String productUnit,          // pack size, e.g. "200 g"
-                              String followUpStatus,       // NEW | IN_PROGRESS | RESOLVED (quality team)
-                              String internalNote,         // quality team only, never shown to customers
+                              String productUnit,
+                              String followUpStatus,
+                              String internalNote,
                               Instant followUpUpdatedAt) {
     }
 
-    /** PUT /api/dashboard/feedback/{feedbackId}/follow-up */
     public record FollowUpRequest(@NotNull FollowUpStatus status, @Size(max = 1000) String internalNote) {
     }
 

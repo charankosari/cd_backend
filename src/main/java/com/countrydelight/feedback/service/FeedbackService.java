@@ -18,7 +18,6 @@ import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-/** Issue capture for low ratings (chips + optional note + optional photo). */
 @Service
 public class FeedbackService {
 

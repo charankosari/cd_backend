@@ -12,7 +12,9 @@ import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -34,18 +36,18 @@ public class CustomerOrder {
     @Column(nullable = false)
     private OrderStatus status;
 
-    /** Snapshot of the delivery area at order time, so quality can trace it even if the user moves. */
     @Column(nullable = false)
     private String area;
 
     @Column(nullable = false)
     private String city;
 
-    /** The address it was delivered to (snapshot of the text, so later edits don't change history). */
     private Long addressId;
 
     @Column(length = 300)
     private String deliveryAddress;
+
+    private Instant placedAt;
 
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<OrderItem> items = new ArrayList<>();
@@ -59,6 +61,7 @@ public class CustomerOrder {
         this.status = status;
         this.area = area;
         this.city = city;
+        this.placedAt = deliveryDate.minusDays(1).atTime(20, 0).atZone(ZoneId.of("Asia/Kolkata")).toInstant();
     }
 
     public OrderItem addItem(String productId, int quantity, BigDecimal unitPrice, PurchaseType purchaseType) {
@@ -67,7 +70,6 @@ public class CustomerOrder {
         return item;
     }
 
-    /** Deliver to this address: area/city (used by the quality dashboard) and the full address text. */
     public void deliverTo(Address address) {
         this.addressId = address.getId();
         this.area = address.getArea();
@@ -77,12 +79,13 @@ public class CustomerOrder {
 
     public Long getAddressId() { return addressId; }
     public String getDeliveryAddress() { return deliveryAddress; }
+    public Instant getPlacedAt() { return placedAt; }
+    public void setPlacedAt(Instant placedAt) { this.placedAt = placedAt; }
 
     public void markDelivered() {
         this.status = OrderStatus.DELIVERED;
     }
 
-    /** Delivered on a specific day (e.g. "Mark delivered" on the dashboard before the planned date). */
     public void markDeliveredOn(LocalDate date) {
         this.status = OrderStatus.DELIVERED;
         this.deliveryDate = date;

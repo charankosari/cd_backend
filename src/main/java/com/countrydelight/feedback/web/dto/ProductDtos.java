@@ -10,17 +10,16 @@ public final class ProductDtos {
     private ProductDtos() {
     }
 
-    /** GET /api/products and /api/products/{productId} */
     public record ProductView(String productId,
                               String name,
                               String description,
                               String category,
                               String unit,
                               BigDecimal price,
-                              String imageUrl,            // full URL, load directly
-                              boolean feedbackEnabled,    // false = we never ask about it (e.g. milk)
-                              boolean subscribable,       // can be bought as a subscription (atta, honey: no)
-                              Integer feedbackDelayDays,  // X: days after delivery we ask
+                              String imageUrl,
+                              boolean feedbackEnabled,
+                              boolean subscribable,
+                              Integer feedbackDelayDays,
                               List<IssueOptionDto> issueOptions) {
     }
 }

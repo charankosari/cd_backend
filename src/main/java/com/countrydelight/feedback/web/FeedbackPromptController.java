@@ -30,7 +30,6 @@ public class FeedbackPromptController {
         return prompts.nextPrompt(customerId);
     }
 
-    /** "Rate now": skip the X-day wait for one delivered item. Returns the card; then use /rating or /skip. */
     @PostMapping("/rate-now")
     public PromptResponse rateNow(@CurrentCustomer Long customerId, @Valid @RequestBody RateNowRequest body) {
         return prompts.rateNow(customerId, body.orderItemId());

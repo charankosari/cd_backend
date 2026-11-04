@@ -11,7 +11,6 @@ public final class AddressDtos {
     private AddressDtos() {
     }
 
-    /** POST /api/addresses and PUT /api/addresses/{id} */
     public record AddressRequest(@NotBlank @Size(max = 30) String label,
                                  @NotBlank @Size(max = 120) String line1,
                                  @Size(max = 120) String line2,

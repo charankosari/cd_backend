@@ -8,6 +8,13 @@ import com.countrydelight.feedback.domain.CustomerOrder;
 import com.countrydelight.feedback.domain.OrderItem;
 import com.countrydelight.feedback.domain.OrderStatus;
 import com.countrydelight.feedback.domain.Product;
+import com.countrydelight.feedback.domain.PurchaseType;
+import com.countrydelight.feedback.domain.Subscription;
+import com.countrydelight.feedback.domain.SubscriptionStatus;
+import com.countrydelight.feedback.repository.SubscriptionRepository;
+import com.countrydelight.feedback.web.dto.DashboardOrderDtos.SubscriptionRow;
+import com.countrydelight.feedback.web.dto.DashboardOrderDtos.SubscriptionsPage;
+import java.time.LocalDate;
 import com.countrydelight.feedback.repository.CartItemRepository;
 import com.countrydelight.feedback.repository.CustomerRepository;
 import com.countrydelight.feedback.repository.OrderRepository;
@@ -31,7 +38,6 @@ import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-/** Dashboard "Orders" screen: all customers' orders, and the "Mark delivered" action. */
 @Service
 public class DashboardOrderService {
 
@@ -41,34 +47,31 @@ public class DashboardOrderService {
     private final DeliveryService deliveries;
     private final CartItemRepository cartItems;
     private final TimeProvider time;
+    private final SubscriptionRepository subscriptionRepo;
 
     public DashboardOrderService(OrderRepository orders, CustomerRepository customers, CatalogService catalog,
-                                 DeliveryService deliveries, CartItemRepository cartItems, TimeProvider time) {
+                                 DeliveryService deliveries, CartItemRepository cartItems, TimeProvider time,
+                                 SubscriptionRepository subscriptionRepo) {
         this.orders = orders;
         this.customers = customers;
         this.catalog = catalog;
         this.deliveries = deliveries;
         this.cartItems = cartItems;
         this.time = time;
+        this.subscriptionRepo = subscriptionRepo;
     }
 
-    /**
-     * status = SCHEDULED | DELIVERED | CANCELLED, or null/blank for all.
-     * Scheduled orders come soonest-delivery first (what to deliver next); others newest first.
-     */
     @Transactional
-    public OrdersPage list(String status, int page, int size) {
+    public OrdersPage list(String status, String type, int page, int size) {
         if (page < 0 || size < 1 || size > 200) {
             throw ApiException.badRequest("BAD_PAGE", "page >= 0 and 1 <= size <= 200");
         }
-        deliveries.markAllDueOrdersDelivered();        // orders whose day has come show as DELIVERED
+        deliveries.markAllDueOrdersDelivered();
 
         OrderStatus filter = parseStatus(status);
-        Sort sort = filter == OrderStatus.SCHEDULED
-                ? Sort.by(Sort.Order.asc("deliveryDate"), Sort.Order.asc("id"))
-                : Sort.by(Sort.Order.desc("deliveryDate"), Sort.Order.desc("id"));
-        PageRequest pageable = PageRequest.of(page, size, sort);
-        Page<CustomerOrder> result = filter == null ? orders.findAll(pageable) : orders.findByStatus(filter, pageable);
+        PurchaseType typeFilter = parseType(type);
+        PageRequest pageable = PageRequest.of(page, size, Sort.by(Sort.Order.desc("placedAt"), Sort.Order.desc("id")));
+        Page<CustomerOrder> result = orders.search(filter, typeFilter, pageable);
 
         Map<Long, Customer> people = customers.findAllById(
                         result.getContent().stream().map(CustomerOrder::getCustomerId).distinct().toList())
@@ -81,6 +84,8 @@ public class DashboardOrderService {
             counts.put(s.name(), orders.countByStatus(s));
         }
         counts.put("ALL", orders.count());
+        counts.put("ONE_TIME", orders.countContaining(PurchaseType.ONE_TIME));
+        counts.put("SUBSCRIPTION", orders.countContaining(PurchaseType.SUBSCRIPTION));
 
         List<OrderRow> rows = result.getContent().stream().map(o -> row(o, people, products)).toList();
         return new OrdersPage(rows, page, size, result.getTotalElements(), result.getTotalPages(), counts);
@@ -97,10 +102,60 @@ public class DashboardOrderService {
                 "Order #" + orderId + " marked delivered on " + PromptService.CARD_DATE.format(order.getDeliveryDate()));
     }
 
-    /**
-     * What customers currently have in their carts. Only lines for tomorrow or later: a line whose date has passed
-     * was never checked out, so it's no longer a live cart.
-     */
+    @Transactional
+    public SubscriptionsPage subscriptions(String status, String productId) {
+        deliveries.markAllDueOrdersDelivered();
+        SubscriptionStatus filter = parseSubscriptionStatus(status);
+        String product = productId == null || productId.isBlank() ? null : productId.trim().toUpperCase();
+        LocalDate today = time.today();
+        List<Subscription> all = subscriptionRepo.findAll();
+        Map<String, Product> products = catalog.allProducts().stream()
+                .collect(Collectors.toMap(Product::getId, Function.identity()));
+        Map<Long, Customer> people = customers.findAllById(all.stream().map(Subscription::getCustomerId).distinct().toList())
+                .stream().collect(Collectors.toMap(Customer::getId, Function.identity()));
+
+        List<SubscriptionRow> rows = all.stream()
+                .filter(s -> filter == null || s.getStatus() == filter)
+                .filter(s -> product == null || s.getProductId().equals(product))
+                .sorted(java.util.Comparator.comparing(Subscription::getId, java.util.Comparator.reverseOrder()))
+                .map(s -> {
+                    Product p = products.get(s.getProductId());
+                    Customer c = people.get(s.getCustomerId());
+                    BigDecimal price = p == null || p.getPrice() == null ? BigDecimal.ZERO : p.getPrice();
+                    return new SubscriptionRow(s.getId(), s.getCustomerId(), c == null ? null : c.getName(),
+                            s.getProductId(), p == null ? s.getProductId() : p.getName(), p == null ? null : p.getUnit(),
+                            catalog.imageUrl(p), s.getQuantity(), s.getFrequency().name(), s.getStatus().name(),
+                            s.getStartDate(), s.nextDelivery(today), s.getEndDate(), s.getDeliveryAddress(),
+                            price.multiply(BigDecimal.valueOf((long) s.getQuantity() * s.getFrequency().deliveriesPerMonth())));
+                }).toList();
+
+        Map<String, Long> counts = new LinkedHashMap<>();
+        for (SubscriptionStatus st : SubscriptionStatus.values()) {
+            counts.put(st.name(), all.stream().filter(s -> s.getStatus() == st
+                    && (product == null || s.getProductId().equals(product))).count());
+        }
+        counts.put("ALL", all.stream().filter(s -> product == null || s.getProductId().equals(product)).count());
+        BigDecimal activeValue = all.stream().filter(s -> s.getStatus() == SubscriptionStatus.ACTIVE)
+                .filter(s -> product == null || s.getProductId().equals(product))
+                .map(s -> {
+                    Product p = products.get(s.getProductId());
+                    BigDecimal price = p == null || p.getPrice() == null ? BigDecimal.ZERO : p.getPrice();
+                    return price.multiply(BigDecimal.valueOf((long) s.getQuantity() * s.getFrequency().deliveriesPerMonth()));
+                }).reduce(BigDecimal.ZERO, BigDecimal::add);
+        return new SubscriptionsPage(rows, counts, activeValue);
+    }
+
+    private static SubscriptionStatus parseSubscriptionStatus(String status) {
+        if (status == null || status.isBlank() || status.equalsIgnoreCase("ALL")) {
+            return null;
+        }
+        try {
+            return SubscriptionStatus.valueOf(status.trim().toUpperCase());
+        } catch (IllegalArgumentException e) {
+            throw ApiException.badRequest("BAD_STATUS", "status must be ACTIVE, PAUSED, CANCELLED or ALL");
+        }
+    }
+
     @Transactional(readOnly = true)
     public CartsOverview carts() {
         List<CartItem> lines = cartItems.findByDeliveryDateAfterOrderByCustomerIdAscDeliveryDateAscIdAsc(time.today());
@@ -114,7 +169,11 @@ public class DashboardOrderService {
                 .collect(Collectors.groupingBy(CartItem::getCustomerId, LinkedHashMap::new, Collectors.toList()));
         List<CustomerCart> carts = byCustomer.entrySet().stream().map(e -> {
             Customer c = people.get(e.getKey());
-            List<CartLine> items = e.getValue().stream().map(i -> {
+            List<CartLine> items = e.getValue().stream()
+                    .sorted(java.util.Comparator.comparing(CartItem::getCreatedAt,
+                                    java.util.Comparator.nullsLast(java.util.Comparator.<java.time.Instant>reverseOrder()))
+                            .thenComparing(CartItem::getId, java.util.Comparator.reverseOrder()))
+                    .map(i -> {
                 Product p = products.get(i.getProductId());
                 BigDecimal price = p == null || p.getPrice() == null ? BigDecimal.ZERO : p.getPrice();
                 return new CartLine(i.getId(), i.getProductId(), p == null ? i.getProductId() : p.getName(),
@@ -142,7 +201,7 @@ public class DashboardOrderService {
                 o.getDeliveryDate(), o.getStatus().name(), o.getStatus() == OrderStatus.SCHEDULED,
                 lines.stream().mapToInt(OrderLine::quantity).sum(),
                 lines.stream().map(OrderLine::lineTotal).reduce(BigDecimal.ZERO, BigDecimal::add), lines,
-                o.getDeliveryAddress());
+                o.getDeliveryAddress(), orderType(lines), o.getPlacedAt());
     }
 
     private OrderLine line(OrderItem i, Product p) {
@@ -150,6 +209,23 @@ public class DashboardOrderService {
         return new OrderLine(i.getId(), i.getProductId(), p == null ? i.getProductId() : p.getName(),
                 p == null ? null : p.getUnit(), i.getQuantity(), price.multiply(BigDecimal.valueOf(i.getQuantity())),
                 i.getPurchaseType().name(), catalog.imageUrl(p));
+    }
+
+    private static String orderType(List<OrderLine> lines) {
+        boolean sub = lines.stream().anyMatch(l -> "SUBSCRIPTION".equals(l.purchaseType()));
+        boolean once = lines.stream().anyMatch(l -> "ONE_TIME".equals(l.purchaseType()));
+        return sub && once ? "MIXED" : sub ? "SUBSCRIPTION" : "ONE_TIME";
+    }
+
+    private static PurchaseType parseType(String type) {
+        if (type == null || type.isBlank() || type.equalsIgnoreCase("ALL")) {
+            return null;
+        }
+        try {
+            return PurchaseType.valueOf(type.trim().toUpperCase());
+        } catch (IllegalArgumentException e) {
+            throw ApiException.badRequest("BAD_TYPE", "type must be ONE_TIME, SUBSCRIPTION or ALL");
+        }
     }
 
     private static OrderStatus parseStatus(String status) {

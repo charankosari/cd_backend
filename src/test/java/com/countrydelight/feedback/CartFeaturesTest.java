@@ -43,7 +43,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 
-/** Cart editing, cart summary, "goes well with your cart" recommendations, dashboard carts. */
 @SpringBootTest(properties = {"app.seed.enabled=false"})
 @AutoConfigureMockMvc
 class CartFeaturesTest {
@@ -79,7 +78,6 @@ class CartFeaturesTest {
         time.reset();
     }
 
-    // ------------------------------------------------------------------ cart API
 
     @Test
     @DisplayName("PATCH changes quantity and date; moving onto an existing line merges; bad input rejected")
@@ -119,7 +117,6 @@ class CartFeaturesTest {
         assertThat(call(get("/api/cart/summary"), null, C, 200).path("lineCount").asInt()).isZero();
     }
 
-    // ------------------------------------------------------------------ for-cart recommendations
 
     @Test
     @DisplayName("Bread in cart -> Butter, Eggs, Honey, for the bread's delivery date; empty cart -> nothing")
@@ -137,12 +134,12 @@ class CartFeaturesTest {
     @DisplayName("Suggestions leave out what's in the cart, low-rated and subscribed products; liked ones come first")
     void suggestionRules() throws Exception {
         call(post("/api/cart/items"), "{\"productId\":\"BREAD\"}", C, 201);
-        call(post("/api/cart/items"), "{\"productId\":\"BUTTER\"}", C, 201);      // Butter in cart
-        rate(deliver("EGGS"), 2);                                                    // Eggs rated low
-        rate(deliver("HONEY"), 5);                                                   // Honey liked
+        call(post("/api/cart/items"), "{\"productId\":\"BUTTER\"}", C, 201);
+        rate(deliver("EGGS"), 2);
+        rate(deliver("HONEY"), 5);
 
         JsonNode rec = call(get("/api/recommendations/for-cart"), null, C, 200);
-        assertThat(ids(rec.path("items")).get(0)).isEqualTo("HONEY");                // liked first
+        assertThat(ids(rec.path("items")).get(0)).isEqualTo("HONEY");
         assertThat(rec.path("items").get(0).path("yourRating").asInt()).isEqualTo(5);
         assertThat(rec.path("items").get(0).path("reason").asText()).contains("you rated it 5");
         assertThat(rec.path("excluded").toString()).contains("\"EGGS\"").contains("RATED_LOW").contains("IN_CART");
@@ -153,14 +150,13 @@ class CartFeaturesTest {
         assertThat(after.path("excluded").toString()).contains("SUBSCRIBED");
     }
 
-    // ------------------------------------------------------------------ dashboard carts
 
     @Test
     @DisplayName("Dashboard carts: live carts grouped by customer; lines whose date has passed are not shown")
     void dashboardCarts() throws Exception {
         call(post("/api/cart/items"), "{\"productId\":\"BREAD\",\"quantity\":2}", C, 201);
         call(post("/api/cart/items"), "{\"productId\":\"HONEY\"}", OTHER, 201);
-        cartItems.save(new CartItem(C, "PANEER", 1, T.minusDays(1), CartItemSource.MANUAL, null, Instant.now()));  // stale
+        cartItems.save(new CartItem(C, "PANEER", 1, T.minusDays(1), CartItemSource.MANUAL, null, Instant.now()));
 
         JsonNode d = call(get("/api/dashboard/carts"), null, null, 200);
         assertThat(d.path("customers").asInt()).isEqualTo(2);
@@ -174,11 +170,10 @@ class CartFeaturesTest {
         }
         assertThat(mine).isNotNull();
         assertThat(mine.path("customerName").asText()).isEqualTo("Test");
-        assertThat(mine.path("items").size()).isEqualTo(1);                          // stale paneer line hidden
+        assertThat(mine.path("items").size()).isEqualTo(1);
         assertThat(mine.path("items").get(0).path("productId").asText()).isEqualTo("BREAD");
     }
 
-    // ------------------------------------------------------------------ helpers
 
     private long deliver(String productId) {
         CustomerOrder o = new CustomerOrder(C, T.minusDays(1), OrderStatus.DELIVERED, "Sector 45", "Gurugram");

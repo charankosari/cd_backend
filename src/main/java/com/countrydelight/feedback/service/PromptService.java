@@ -38,16 +38,11 @@ import java.util.Locale;
 import java.util.Optional;
 import java.util.Set;
 
-/**
- * The in-app feedback card lifecycle: decide what (if anything) to show, take the one-tap rating,
- * route to buy-again or issue capture, and handle skip.
- */
 @Service
 public class PromptService {
 
     static final DateTimeFormatter CARD_DATE = DateTimeFormatter.ofPattern("EEE, d MMM", Locale.ENGLISH);
 
-    /** Interactions that consume the user's frequency cap. CANCELLED (system withdrew it) does not. */
     private static final Set<PromptStatus> COUNTS_FOR_CAP =
             EnumSet.of(PromptStatus.ANSWERED, PromptStatus.SKIPPED, PromptStatus.IGNORED);
 
@@ -81,10 +76,6 @@ public class PromptService {
         this.props = props;
     }
 
-    /**
-     * Called every time the home screen loads. Returns at most ONE card.
-     * Order of checks: existing pending card, then frequency cap, then pick the best new candidate.
-     */
     @Transactional
     public PromptResponse nextPrompt(Long customerId) {
         requireCustomer(customerId);
@@ -92,17 +83,14 @@ public class PromptService {
         LocalDate today = time.today();
         Instant now = time.now();
 
-        // 1. A card is already out there: keep showing the same one until it is answered / skipped / ignored.
-        //    Only cards WE started (AUTO). A "Rate now" the user opened and left isn't pushed onto the home screen.
         Optional<FeedbackPrompt> pendingOpt = prompts.findFirstByCustomerIdAndStatusAndSourceOrderByIdDesc(
                 customerId, PromptStatus.PENDING, PromptSource.AUTO);
         if (pendingOpt.isPresent()) {
             FeedbackPrompt pending = pendingOpt.get();
             if (subscriptions.isSubscribed(customerId, pending.getProductId(), today)
                     || alreadyReviewed(customerId, pending.getProductId(), pending.getId())) {
-                pending.resolve(PromptStatus.CANCELLED, today, now);   // subscribed, or reviewed via "Rate now"
+                pending.resolve(PromptStatus.CANCELLED, today, now);
             } else if (isIgnored(pending, today)) {
-                // Count the cap from the last day the user actually saw it.
                 pending.resolve(PromptStatus.IGNORED, pending.getLastShownOn(), now);
             } else {
                 pending.recordImpression(today);
@@ -110,14 +98,12 @@ public class PromptService {
             }
         }
 
-        // 2. Frequency cap across all products.
         FrequencyCap cap = frequencyCap(customerId, today);
         if (cap.capped()) {
             return PromptResponse.hidden("FREQUENCY_CAP",
                     "Asked recently; next feedback ask possible on " + cap.nextEligibleOn(), cap.nextEligibleOn());
         }
 
-        // 3. Pick the best candidate.
         Evaluation evaluation = engine.evaluate(customerId, today);
         if (evaluation.rankedCandidates().isEmpty()) {
             return PromptResponse.hidden("NOTHING_TO_ASK", "No delivery is due for feedback today", null);
@@ -140,7 +126,6 @@ public class PromptService {
 
     @Transactional(readOnly = true)
     public FrequencyCap frequencyCap(Long customerId, LocalDate today) {
-        // Only asks WE made count. Ratings the user chose to give ("Rate now") don't use up the cap.
         Optional<LocalDate> last = prompts.findByCustomerIdOrderByIdAsc(customerId).stream()
                 .filter(p -> !p.isUserInitiated())
                 .filter(p -> COUNTS_FOR_CAP.contains(p.getStatus()) && p.getResolvedOn() != null)
@@ -150,10 +135,6 @@ public class PromptService {
         return new FrequencyCap(last.orElse(null), next, next != null && today.isBefore(next));
     }
 
-    /**
-     * "Rate now": the user doesn't want to wait X days. Opens a card for this delivered item straight away,
-     * with no waiting period, no frequency cap and no priority ranking. Then use the normal rating/skip endpoints.
-     */
     @Transactional
     public PromptResponse rateNow(Long customerId, Long orderItemId) {
         requireCustomer(customerId);
@@ -189,13 +170,11 @@ public class PromptService {
         } else if (prompt.getStatus() == PromptStatus.ANSWERED) {
             throw ApiException.conflict("ALREADY_RATED", "You've already rated this delivery");
         } else if (prompt.getStatus() != PromptStatus.PENDING) {
-            prompt.openForUser();          // skipped / ignored earlier, but now the user wants to rate it
+            prompt.openForUser();
         }
-        // PENDING: return the same card (if it's the home-screen card, rating it here answers that card too)
         return PromptResponse.shown(toCard(prompt));
     }
 
-    /** One tap = one rating. Saves immediately, then tells the app which screen comes next. */
     @Transactional
     public RatingResponse submitRating(Long customerId, Long promptId, int rating) {
         FeedbackPrompt prompt = ownedPrompt(customerId, promptId);
@@ -204,7 +183,6 @@ public class PromptService {
             case SKIPPED, CANCELLED -> throw ApiException.conflict("PROMPT_CLOSED",
                     "This feedback request is closed (" + prompt.getStatus() + ")");
             default -> {
-                // PENDING, or IGNORED but the user still had the card on screen: a late answer is still useful.
             }
         }
         if (alreadyReviewed(customerId, prompt.getProductId(), prompt.getId())) {
@@ -252,7 +230,6 @@ public class PromptService {
         String productName = catalog.product(prompt.getProductId()).getName();
         switch (prompt.getStatus()) {
             case SKIPPED -> {
-                // Idempotent: the app may retry.
             }
             case PENDING, IGNORED -> prompt.resolve(PromptStatus.SKIPPED, time.today(), time.now());
             default -> throw ApiException.conflict("PROMPT_CLOSED",
@@ -262,10 +239,6 @@ public class PromptService {
                 "No problem. We won't ask about " + productName + " again for a while.");
     }
 
-    /**
-     * One review per product (feedback.one-review-per-product): true if the household already rated this product
-     * through another card. Always false when the setting is off.
-     */
     private boolean alreadyReviewed(Long customerId, String productId, Long exceptPromptId) {
         return props.oneReviewPerProduct() && prompts.findByCustomerIdOrderByIdAsc(customerId).stream()
                 .anyMatch(p -> p.getStatus() == PromptStatus.ANSWERED && p.getProductId().equals(productId)

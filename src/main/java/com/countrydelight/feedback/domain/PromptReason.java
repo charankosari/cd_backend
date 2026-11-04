@@ -1,9 +1,5 @@
 package com.countrydelight.feedback.domain;
 
-/**
- * Why a delivery was chosen for feedback. The weights decide which product to ask about first
- * when several are due on the same day.
- */
 public enum PromptReason {
     NEW_TO_HOUSEHOLD(50, "First time this household bought this product"),
     FIRST_TIME_CUSTOMER(30, "Household's first order with us"),

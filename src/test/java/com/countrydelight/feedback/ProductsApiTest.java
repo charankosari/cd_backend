@@ -13,7 +13,6 @@ import org.springframework.test.web.servlet.MvcResult;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 
-/** Product catalog API + product images, using the real seeded catalog. */
 @SpringBootTest(properties = {"app.seed.enabled=true", "spring.datasource.url=jdbc:h2:mem:products-api;DB_CLOSE_DELAY=-1"})
 @AutoConfigureMockMvc
 class ProductsApiTest {

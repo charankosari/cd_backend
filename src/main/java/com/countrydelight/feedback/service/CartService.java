@@ -65,7 +65,6 @@ public class CartService {
             source = CartItemSource.FEEDBACK_BUY_AGAIN;
         }
 
-        // Same product on the same date: bump the quantity instead of adding a duplicate line.
         CartItem line = cart.findFirstByCustomerIdAndProductIdAndDeliveryDate(customerId, product.getId(), date)
                 .orElse(null);
         if (line != null) {
@@ -83,7 +82,7 @@ public class CartService {
     @Transactional(readOnly = true)
     public CartResponse view(Long customerId) {
         requireCustomer(customerId);
-        List<CartItemResponse> items = cart.findByCustomerIdOrderByDeliveryDateAscIdAsc(customerId).stream()
+        List<CartItemResponse> items = cart.findByCustomerIdOrderByCreatedAtDescIdDesc(customerId).stream()
                 .map(i -> toDto(i, catalog.product(i.getProductId())))
                 .toList();
         int qty = items.stream().mapToInt(CartItemResponse::quantity).sum();
@@ -99,10 +98,6 @@ public class CartService {
         return view(customerId);
     }
 
-    /**
-     * Change a line's quantity and/or delivery date. Moving it to a date that already has the same product
-     * merges the two lines (quantities added), so the cart never shows duplicates.
-     */
     @Transactional
     public AddToCartResponse update(Long customerId, Long cartItemId, UpdateCartItemRequest req) {
         if (req.quantity() == null && req.deliveryDate() == null) {
@@ -145,7 +140,6 @@ public class CartService {
         return view(customerId);
     }
 
-    /** Small payload for the cart badge on every screen. */
     @Transactional(readOnly = true)
     public CartSummary summary(Long customerId) {
         CartResponse full = view(customerId);
@@ -160,7 +154,6 @@ public class CartService {
                 .orElseThrow(() -> ApiException.notFound("Cart item " + cartItemId));
     }
 
-    /** Delivery dates: tomorrow .. today + 30 days. */
     private void checkDeliveryDate(LocalDate date, LocalDate today) {
         if (!date.isAfter(today)) {
             throw ApiException.badRequest("INVALID_DELIVERY_DATE", "Delivery date must be tomorrow or later");

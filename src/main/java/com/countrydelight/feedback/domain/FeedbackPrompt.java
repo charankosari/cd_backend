@@ -15,10 +15,6 @@ import java.time.LocalDate;
 import java.util.Arrays;
 import java.util.List;
 
-/**
- * One "ask" shown to a user about one delivered product. Created the first time the card is shown.
- * Tracks impressions so we can detect "ignored" and enforce the frequency cap.
- */
 @Entity
 @Table(name = "feedback_prompts",
         uniqueConstraints = @UniqueConstraint(name = "uk_prompt_order_item", columnNames = "order_item_id"))
@@ -52,7 +48,6 @@ public class FeedbackPrompt {
     private String area;
     private String city;
 
-    /** Comma separated PromptReason names. */
     private String reasons;
 
     private int priorityScore;
@@ -92,7 +87,6 @@ public class FeedbackPrompt {
         this.createdAt = createdAt;
     }
 
-    /** Counts an impression at most once per calendar day. */
     public void recordImpression(LocalDate today) {
         if (firstShownOn == null) {
             firstShownOn = today;
@@ -103,7 +97,6 @@ public class FeedbackPrompt {
         }
     }
 
-    /** The user chose "Rate now": this prompt is theirs, and a skipped/ignored one opens again. */
     public void openForUser() {
         this.source = PromptSource.USER;
         this.status = PromptStatus.PENDING;

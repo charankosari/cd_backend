@@ -17,7 +17,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 
-/** The three presentation accounts (201 subscriber, 202 happy, 203 mixed) behave as documented. */
 @SpringBootTest(properties = {"app.seed.enabled=true", "spring.datasource.url=jdbc:h2:mem:demo-accounts;DB_CLOSE_DELAY=-1"})
 @AutoConfigureMockMvc
 class DemoAccountsTest {
@@ -77,7 +76,6 @@ class DemoAccountsTest {
                 dahiVerdicts.add(i.path("verdict").asText());
             }
         });
-        // Subscription deliveries -> SUBSCRIPTION_DELIVERY; the one-time extra Dahi -> SUBSCRIBED. Never ELIGIBLE.
         assertThat(dahiVerdicts).isNotEmpty().doesNotContain("ELIGIBLE").contains("SUBSCRIBED");
     }
 

@@ -22,11 +22,6 @@ import java.time.LocalDate;
 import java.util.Comparator;
 import java.util.List;
 
-/**
- * Subscriptions from the app: subscribe, change, pause / resume, cancel.
- * Rules: one live (active or paused) subscription per product; only subscribable products (milk yes, atta no);
- * start between tomorrow and +30 days; changes apply from the next delivery (today's has already gone out).
- */
 @Service
 public class SubscriptionService {
 
@@ -55,8 +50,7 @@ public class SubscriptionService {
         requireCustomer(customerId);
         deliveries.generateFor(customerId);
         List<SubscriptionView> views = subscriptions.findByCustomerId(customerId).stream()
-                .sorted(Comparator.comparing((Subscription s) -> s.getStatus().ordinal())
-                        .thenComparing(Subscription::getId, Comparator.reverseOrder()))
+                .sorted(Comparator.comparing(Subscription::getId, Comparator.reverseOrder()))
                 .map(s -> view(s, null))
                 .toList();
         int active = (int) views.stream().filter(v -> v.status().equals("ACTIVE")).count();
@@ -96,7 +90,7 @@ public class SubscriptionService {
             throw ApiException.badRequest("NOTHING_TO_UPDATE", "Send quantity, frequency and/or addressId");
         }
         Subscription s = live(customerId, id);
-        deliveries.generateFor(customerId);                 // today's delivery stays as it was
+        deliveries.generateFor(customerId);
         s.setPlan(req.quantity() != null ? req.quantity() : s.getQuantity(),
                 req.frequency() != null ? req.frequency() : s.getFrequency());
         if (req.addressId() != null) {

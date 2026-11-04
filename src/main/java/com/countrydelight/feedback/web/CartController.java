@@ -41,13 +41,11 @@ public class CartController {
         return cart.view(customerId);
     }
 
-    /** Line count, total quantity, total amount, next delivery date: for the cart badge. */
     @GetMapping("/summary")
     public CartSummary summary(@CurrentCustomer Long customerId) {
         return cart.summary(customerId);
     }
 
-    /** Change quantity and/or delivery date of one line. */
     @PatchMapping("/items/{cartItemId}")
     public AddToCartResponse update(@CurrentCustomer Long customerId, @PathVariable Long cartItemId,
                                     @Valid @RequestBody UpdateCartItemRequest body) {
@@ -59,7 +57,6 @@ public class CartController {
         return cart.remove(customerId, cartItemId);
     }
 
-    /** Empty the whole cart. */
     @DeleteMapping
     public CartResponse clear(@CurrentCustomer Long customerId) {
         return cart.clear(customerId);

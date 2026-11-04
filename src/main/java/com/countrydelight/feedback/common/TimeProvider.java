@@ -9,11 +9,6 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.ZoneId;
 
-/**
- * Single source of "today". All business logic reads the date from here so that testers can
- * move the clock forward (POST /api/admin/clock) to check the X-day and frequency-cap rules
- * without waiting real days.
- */
 @Component
 public class TimeProvider {
 

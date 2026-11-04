@@ -9,10 +9,6 @@ import jakarta.persistence.Table;
 
 import java.time.Instant;
 
-/**
- * One OTP sent to one phone number. We store only a HASH of the code (like a password),
- * so someone reading the database can't log in as the user.
- */
 @Entity
 @Table(name = "otp_challenges")
 public class OtpChallenge {
@@ -35,7 +31,6 @@ public class OtpChallenge {
 
     private int attempts;
 
-    /** Set when the code was used successfully, or replaced by a newer code. A used code can't be reused. */
     private Instant consumedAt;
 
     protected OtpChallenge() {

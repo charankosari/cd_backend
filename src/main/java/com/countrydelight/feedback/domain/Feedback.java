@@ -19,10 +19,6 @@ import java.util.Collection;
 import java.util.LinkedHashSet;
 import java.util.Set;
 
-/**
- * A rating plus optional issue details. Order details (product, order, delivery date, area) are copied
- * onto the row so the quality team can trace it even if orders or customers change later.
- */
 @Entity
 @Table(name = "feedback")
 public class Feedback {
@@ -73,7 +69,6 @@ public class Feedback {
     private LocalDate createdOn;
     private Instant detailsSubmittedAt;
 
-    /** Quality-team follow-up, set from the dashboard. Internal only. */
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private FollowUpStatus followUpStatus = FollowUpStatus.NEW;

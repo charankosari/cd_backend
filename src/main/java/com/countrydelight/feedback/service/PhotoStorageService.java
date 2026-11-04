@@ -15,10 +15,6 @@ import java.nio.file.StandardCopyOption;
 import java.util.Map;
 import java.util.UUID;
 
-/**
- * Stores issue photos on local disk and serves them under /uploads/**.
- * In production this would be a pre-signed S3/GCS upload; the API shape stays the same.
- */
 @Service
 public class PhotoStorageService {
 

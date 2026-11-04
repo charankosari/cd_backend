@@ -8,7 +8,6 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 
-/** A product-specific "what went wrong" chip, e.g. PANEER / HARD / "Too hard / rubbery". */
 @Entity
 @Table(name = "issue_options", uniqueConstraints = @UniqueConstraint(columnNames = {"product_id", "code"}))
 public class IssueOption {

@@ -23,22 +23,15 @@ public class Product {
     @Column(precision = 10, scale = 2)
     private BigDecimal price;
 
-    /** X: days after delivery to ask for feedback. Null means we never ask for this product. */
     private Integer feedbackDelayDays;
 
-    /**
-     * Image path served by this backend (e.g. "/products/paneer.jpg", files in resources/static/products),
-     * or a full https URL. API responses always turn it into a full URL (CatalogService.imageUrl).
-     */
     private String imageUrl;
 
     @Column(length = 300)
     private String description;
 
-    /** Dairy, Bakery, Staples… for grouping in the app. */
     private String category;
 
-    /** Can be bought as a daily / alternate-day subscription (milk yes, atta no). */
     private boolean subscribable = true;
 
     protected Product() {

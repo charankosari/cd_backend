@@ -17,7 +17,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-/** Product + product-specific issue chips lookups. */
 @Service
 public class CatalogService {
 
@@ -39,18 +38,13 @@ public class CatalogService {
         return products.findAll().stream().sorted((a, b) -> a.getId().compareTo(b.getId())).toList();
     }
 
-    /**
-     * Full image URL for API responses, e.g. "https://<this-server>/products/paneer.jpg", so apps can load it directly.
-     * Built from the current request; behind Railway's proxy, X-Forwarded-* headers make it https
-     * (server.forward-headers-strategy in application.yml).
-     */
     public String imageUrl(Product p) {
         String path = p == null ? null : p.getImageUrl();
         if (path == null || path.isBlank() || path.startsWith("http://") || path.startsWith("https://")) {
             return path;
         }
         if (RequestContextHolder.getRequestAttributes() == null) {
-            return path;                       // not inside a web request (e.g. startup): keep the relative path
+            return path;
         }
         return ServletUriComponentsBuilder.fromCurrentContextPath().path(path).toUriString();
     }
@@ -62,7 +56,6 @@ public class CatalogService {
                 .toList();
     }
 
-    /** "PRODUCT:CODE" -> label, for all products. */
     @Transactional(readOnly = true)
     public Map<String, String> issueLabelIndex() {
         Map<String, String> index = new LinkedHashMap<>();
@@ -72,7 +65,6 @@ public class CatalogService {
         return index;
     }
 
-    /** Maps codes to labelled chips, in the product's chip order (labelIndex is ordered by sortOrder). */
     public List<IssueOptionDto> toDtos(String productId, Collection<String> codes, Map<String, String> labelIndex) {
         List<String> order = List.copyOf(labelIndex.keySet());
         return codes.stream()

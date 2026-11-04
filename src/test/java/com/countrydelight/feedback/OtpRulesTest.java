@@ -18,7 +18,6 @@ import java.util.Set;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 
-/** OTP rules with the normal (30 s) resend cooldown, plus the random code generator. */
 @SpringBootTest(properties = {"app.seed.enabled=false"})
 @AutoConfigureMockMvc
 class OtpRulesTest {

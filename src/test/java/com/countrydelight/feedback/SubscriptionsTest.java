@@ -33,7 +33,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 
-/** Subscriptions: subscribe, deliveries on schedule, pause/resume, change, cancel; never asked for feedback. */
 @SpringBootTest(properties = {"app.seed.enabled=false"})
 @AutoConfigureMockMvc
 class SubscriptionsTest {
@@ -96,7 +95,7 @@ class SubscriptionsTest {
 
         time.setToday(T.plusDays(4));
         JsonNode orders = call(get("/api/orders"), null, 200);
-        assertThat(orders.size()).isEqualTo(4);                                   // T+1 .. T+4, one per morning
+        assertThat(orders.size()).isEqualTo(4);
         List<String> paneerDays = new ArrayList<>();
         for (JsonNode o : orders) {
             assertThat(o.path("status").asText()).isEqualTo("DELIVERED");
@@ -110,10 +109,10 @@ class SubscriptionsTest {
             }
         }
         assertThat(paneerDays).containsExactlyInAnyOrder(T.plusDays(1).toString(), T.plusDays(3).toString());
-        assertThat(call(get("/api/orders"), null, 200).size()).isEqualTo(4);   // no duplicates on re-read
+        assertThat(call(get("/api/orders"), null, 200).size()).isEqualTo(4);
 
         JsonNode card = call(get("/api/feedback-prompts/next"), null, 200);
-        assertThat(card.path("show").asBoolean()).isFalse();                        // subscribed paneer never asked
+        assertThat(card.path("show").asBoolean()).isFalse();
     }
 
     @Test
@@ -126,7 +125,7 @@ class SubscriptionsTest {
         assertThat(paused.has("nextDeliveryDate")).isFalse();
 
         time.setToday(T.plusDays(5));
-        assertThat(call(get("/api/orders"), null, 200).size()).isEqualTo(2);       // T+1, T+2 only
+        assertThat(call(get("/api/orders"), null, 200).size()).isEqualTo(2);
         JsonNode resumed = call(post("/api/subscriptions/" + id + "/resume"), null, 200);
         assertThat(resumed.path("nextDeliveryDate").asText()).isEqualTo(T.plusDays(6).toString());
 
@@ -134,7 +133,7 @@ class SubscriptionsTest {
         time.setToday(T.plusDays(6));
         JsonNode orders = call(get("/api/orders"), null, 200);
         assertThat(orders.size()).isEqualTo(3);
-        assertThat(orders.get(0).path("items").get(0).path("quantity").asInt()).isEqualTo(3);   // newest first
+        assertThat(orders.get(0).path("items").get(0).path("quantity").asInt()).isEqualTo(3);
         call(patch("/api/subscriptions/" + id), "{}", 400);
     }
 

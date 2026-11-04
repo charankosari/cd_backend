@@ -32,7 +32,6 @@ import java.util.TreeMap;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-/** Placing orders from the cart, and the "My orders" screen. */
 @Service
 public class OrderService {
 
@@ -60,17 +59,12 @@ public class OrderService {
         this.props = props;
     }
 
-    /**
-     * Turns the cart into orders: one order per delivery date, status SCHEDULED, then empties those cart lines.
-     * onlyDate (optional) = place only the lines for that date. addressId (optional) = deliver there; otherwise the
-     * household's default address.
-     */
     @Transactional
     public PlaceOrderResponse placeFromCart(Long customerId, LocalDate onlyDate, Long addressId) {
         Customer customer = customers.findById(customerId)
                 .orElseThrow(() -> ApiException.notFound("Customer " + customerId));
         LocalDate today = time.today();
-        Address deliverTo = addresses.forDelivery(customerId, addressId).orElse(null);   // 404 if not theirs
+        Address deliverTo = addresses.forDelivery(customerId, addressId).orElse(null);
 
         List<CartItem> lines = cart.findByCustomerIdOrderByDeliveryDateAscIdAsc(customerId).stream()
                 .filter(l -> onlyDate == null || l.getDeliveryDate().equals(onlyDate))
@@ -93,6 +87,7 @@ public class OrderService {
             if (deliverTo != null) {
                 order.deliverTo(deliverTo);
             }
+            order.setPlacedAt(time.now());
             for (CartItem line : dayLines) {
                 order.addItem(line.getProductId(), line.getQuantity(), catalog.product(line.getProductId()).getPrice(),
                         PurchaseType.ONE_TIME);
@@ -108,14 +103,13 @@ public class OrderService {
         return new PlaceOrderResponse(created.stream().map(o -> view(o, reviews, today)).toList(), message);
     }
 
-    /** "My orders": newest first, with each item's feedback state. */
     @Transactional
     public List<OrderView> list(Long customerId) {
         requireCustomer(customerId);
         deliveries.markDueOrdersDelivered(customerId);
         Reviews reviews = reviews(customerId);
         LocalDate today = time.today();
-        return orders.findByCustomerIdOrderByDeliveryDateDescIdDesc(customerId).stream()
+        return orders.findByCustomerIdOrderByPlacedAtDescIdDesc(customerId).stream()
                 .map(o -> view(o, reviews, today))
                 .toList();
     }
@@ -130,9 +124,7 @@ public class OrderService {
         return view(order, reviews(customerId), time.today());
     }
 
-    // ------------------------------------------------------------------ helpers
 
-    /** The household's reviews: per delivered item, and the first review per product (one review per product). */
     private record Reviews(Map<Long, Feedback> byItem, Map<String, Feedback> byProduct) {
     }
 
@@ -153,7 +145,7 @@ public class OrderService {
         int qty = items.stream().mapToInt(OrderItemView::quantity).sum();
         BigDecimal total = items.stream().map(OrderItemView::lineTotal).reduce(BigDecimal.ZERO, BigDecimal::add);
         return new OrderView(o.getId(), o.getDeliveryDate(), o.getStatus().name(), o.getArea(), o.getCity(),
-                qty, total, items, o.getAddressId(), o.getDeliveryAddress());
+                qty, total, items, o.getAddressId(), o.getDeliveryAddress(), o.getPlacedAt());
     }
 
     private OrderItemView itemView(CustomerOrder o, OrderItem i, Feedback feedback, Feedback productReview) {
@@ -175,7 +167,6 @@ public class OrderService {
             return new ItemFeedback("NOT_AVAILABLE", false, null, null, null);
         }
         if (props.oneReviewPerProduct() && productReview != null) {
-            // Reordered a product they already reviewed: no new review; show the earlier one.
             return new ItemFeedback("ALREADY_REVIEWED", false, null, productReview.getRating(), productReview.getId());
         }
         if (o.getStatus() != OrderStatus.DELIVERED) {

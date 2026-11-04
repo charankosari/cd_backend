@@ -12,10 +12,11 @@ public interface CartItemRepository extends JpaRepository<CartItem, Long> {
 
     List<CartItem> findByCustomerIdOrderByDeliveryDateAscIdAsc(Long customerId);
 
+    List<CartItem> findByCustomerIdOrderByCreatedAtDescIdDesc(Long customerId);
+
     Optional<CartItem> findFirstByCustomerIdAndProductIdAndDeliveryDate(Long customerId, String productId, LocalDate date);
 
     long countByFeedbackIdIn(Collection<Long> feedbackIds);
 
-    /** Dashboard "Carts": lines still waiting to be ordered (delivery date tomorrow or later). */
     List<CartItem> findByDeliveryDateAfterOrderByCustomerIdAscDeliveryDateAscIdAsc(LocalDate date);
 }

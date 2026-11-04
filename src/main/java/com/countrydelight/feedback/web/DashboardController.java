@@ -5,6 +5,7 @@ import com.countrydelight.feedback.service.DashboardService;
 import com.countrydelight.feedback.web.dto.DashboardOrderDtos.CartsOverview;
 import com.countrydelight.feedback.web.dto.DashboardOrderDtos.DeliverResponse;
 import com.countrydelight.feedback.web.dto.DashboardOrderDtos.OrdersPage;
+import com.countrydelight.feedback.web.dto.DashboardOrderDtos.SubscriptionsPage;
 import com.countrydelight.feedback.web.dto.DashboardDtos.FeedbackRow;
 import com.countrydelight.feedback.web.dto.DashboardDtos.Filters;
 import com.countrydelight.feedback.web.dto.DashboardDtos.FollowUpRequest;
@@ -60,27 +61,30 @@ public class DashboardController {
         return dashboard.filters();
     }
 
-    /** Orders screen: all customers' orders. status = SCHEDULED | DELIVERED | CANCELLED | ALL (default ALL). */
     @GetMapping("/orders")
     public OrdersPage orders(@RequestParam(required = false) String status,
+                             @RequestParam(required = false) String type,
                              @RequestParam(defaultValue = "0") int page,
                              @RequestParam(defaultValue = "50") int size) {
-        return orders.list(status, page, size);
+        return orders.list(status, type, page, size);
     }
 
-    /** Carts screen: what customers have in their carts right now (lines for tomorrow or later). */
+    @GetMapping("/subscriptions")
+    public SubscriptionsPage subscriptions(@RequestParam(required = false) String status,
+                                           @RequestParam(required = false) String productId) {
+        return orders.subscriptions(status, productId);
+    }
+
     @GetMapping("/carts")
     public CartsOverview carts() {
         return orders.carts();
     }
 
-    /** "Mark delivered": deliver a scheduled order now (its delivery date becomes today if it was later). */
     @PostMapping("/orders/{orderId}/deliver")
     public DeliverResponse deliver(@PathVariable Long orderId) {
         return orders.deliver(orderId);
     }
 
-    /** Quality team: set status (NEW / IN_PROGRESS / RESOLVED) and an internal note. Shared by everyone on the team. */
     @PutMapping("/feedback/{feedbackId}/follow-up")
     public FeedbackRow followUp(@PathVariable Long feedbackId, @Valid @RequestBody FollowUpRequest body) {
         return dashboard.updateFollowUp(feedbackId, body.status(), body.internalNote());

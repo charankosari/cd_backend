@@ -44,10 +44,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 
-/**
- * End-to-end checks of the rules through the HTTP API, covering the tricky cases from the brief:
- * subscribed product, bought twice before rating, frequency cap, skipped feedback, rating exactly 4.
- */
 @SpringBootTest(properties = {"app.seed.enabled=false", "app.upload-dir=target/test-uploads"})
 @AutoConfigureMockMvc
 class FeedbackFlowIntegrationTest {
@@ -88,7 +84,6 @@ class FeedbackFlowIntegrationTest {
         time.reset();
     }
 
-    // ------------------------------------------------------------------ who we ask / when
 
     @Test
     @DisplayName("Subscribed product (active) is never asked, even for a one-time extra")
@@ -117,7 +112,7 @@ class FeedbackFlowIntegrationTest {
     @Test
     @DisplayName("Not asked before X days; asked exactly on day X")
     void askedOnlyFromDayX() throws Exception {
-        deliver(6, PurchaseType.ONE_TIME, "GHEE");            // X=7, due tomorrow
+        deliver(6, PurchaseType.ONE_TIME, "GHEE");
         assertHidden(next(C), "NOTHING_TO_ASK");
         time.setToday(T.plusDays(1));
         JsonNode r = next(C);
@@ -128,7 +123,7 @@ class FeedbackFlowIntegrationTest {
     @Test
     @DisplayName("Not asked once the window after day X has passed")
     void notAskedAfterWindow() throws Exception {
-        deliver(5, PurchaseType.ONE_TIME, "PANEER");          // due T-4, window ended T-1
+        deliver(5, PurchaseType.ONE_TIME, "PANEER");
         assertHidden(next(C), "NOTHING_TO_ASK");
     }
 
@@ -144,15 +139,15 @@ class FeedbackFlowIntegrationTest {
         assertThat(r.path("prompt").path("orderId").asLong()).isEqualTo(latest.getOrder().getId());
 
         rate(C, r.path("prompt").path("promptId").asLong(), 5);
-        time.setToday(T.plusDays(3));                          // past the frequency cap
+        time.setToday(T.plusDays(3));
         assertHidden(next(C), "NOTHING_TO_ASK");
     }
 
     @Test
     @DisplayName("Bought twice, second delivery becomes due later: not asked again after rating")
     void secondDeliveryDueLaterNotAskedAgain() throws Exception {
-        deliver(2, PurchaseType.ONE_TIME, "BREAD");            // due today
-        deliver(1, PurchaseType.ONE_TIME, "BREAD");            // due tomorrow
+        deliver(2, PurchaseType.ONE_TIME, "BREAD");
+        deliver(1, PurchaseType.ONE_TIME, "BREAD");
         JsonNode r = next(C);
         assertThat(r.path("prompt").path("deliveryDate").asText()).isEqualTo(T.minusDays(2).toString());
         rate(C, r.path("prompt").path("promptId").asLong(), 4);
@@ -160,7 +155,7 @@ class FeedbackFlowIntegrationTest {
         time.setToday(T.plusDays(3));
         assertHidden(next(C), "NOTHING_TO_ASK");
         JsonNode report = getJson(get("/api/admin/customers/" + C + "/eligibility"));
-        assertThat(report.toString()).contains("PRODUCT_ALREADY_REVIEWED");   // one review per product
+        assertThat(report.toString()).contains("PRODUCT_ALREADY_REVIEWED");
     }
 
     @Test
@@ -174,7 +169,6 @@ class FeedbackFlowIntegrationTest {
         assertThat(r.path("prompt").path("reasons").toString()).contains("NEW_TO_HOUSEHOLD");
     }
 
-    // ------------------------------------------------------------------ frequency cap, skip, ignore
 
     @Test
     @DisplayName("Frequency cap: after answering, no new card for 3 days even if another product is due")
@@ -212,9 +206,9 @@ class FeedbackFlowIntegrationTest {
     @Test
     @DisplayName("Skip: product is not asked again, other products still are after the cap")
     void skipSuppressesProduct() throws Exception {
-        deliver(1, PurchaseType.ONE_TIME, "PANEER");           // new to household -> asked first
+        deliver(1, PurchaseType.ONE_TIME, "PANEER");
         deliver(30, PurchaseType.ONE_TIME, "BREAD");
-        deliver(2, PurchaseType.ONE_TIME, "BREAD");            // repeat -> lower priority, due today, window to T+3
+        deliver(2, PurchaseType.ONE_TIME, "BREAD");
         JsonNode r = next(C);
         assertThat(r.path("prompt").path("productId").asText()).isEqualTo("PANEER");
         long promptId = r.path("prompt").path("promptId").asLong();
@@ -223,7 +217,6 @@ class FeedbackFlowIntegrationTest {
         assertThat(skip.path("status").asText()).isEqualTo("SKIPPED");
         assertHidden(next(C), "FREQUENCY_CAP");
 
-        // A fresh paneer delivery becomes due on T+3 too; paneer must stay suppressed, bread is asked.
         deliver(-2, PurchaseType.ONE_TIME, "PANEER");
         time.setToday(T.plusDays(3));
         JsonNode after = next(C);
@@ -242,10 +235,10 @@ class FeedbackFlowIntegrationTest {
 
         time.setToday(T.plusDays(3));
         JsonNode r = next(C);
-        assertHidden(r, "FREQUENCY_CAP");                       // cap counted from last impression (T+2)
+        assertHidden(r, "FREQUENCY_CAP");
         assertThat(r.path("nextEligibleOn").asText()).isEqualTo(T.plusDays(5).toString());
 
-        deliver(-4, PurchaseType.ONE_TIME, "PANEER");           // delivered T+4, due T+5
+        deliver(-4, PurchaseType.ONE_TIME, "PANEER");
         time.setToday(T.plusDays(5));
         assertHidden(next(C), "NOTHING_TO_ASK");
     }
@@ -270,7 +263,6 @@ class FeedbackFlowIntegrationTest {
         assertThat(mvc.perform(ratingRequest(2L, id, 5)).andReturn().getResponse().getStatus()).isEqualTo(404);
     }
 
-    // ------------------------------------------------------------------ rating branches
 
     @Test
     @DisplayName("Rating exactly 4 -> BUY_AGAIN with tomorrow as default date")
@@ -324,7 +316,6 @@ class FeedbackFlowIntegrationTest {
         assertHidden(next(C), "NOTHING_TO_ASK");
     }
 
-    // ------------------------------------------------------------------ issue details
 
     @Test
     @DisplayName("Issue details: saved with order trace (product, delivery date, area); validation enforced")
@@ -340,7 +331,7 @@ class FeedbackFlowIntegrationTest {
         MvcResult ok = putIssues(feedbackId, "{\"issueCodes\":[\"smell\",\"HARD\"],\"note\":\"  smelled off \"}");
         assertThat(ok.getResponse().getStatus()).isEqualTo(200);
         JsonNode body = json.readTree(ok.getResponse().getContentAsString());
-        assertThat(body.path("issues").get(0).path("code").asText()).isEqualTo("HARD");  // chip order
+        assertThat(body.path("issues").get(0).path("code").asText()).isEqualTo("HARD");
         assertThat(body.path("issues").get(1).path("code").asText()).isEqualTo("SMELL");
         assertThat(body.path("note").asText()).isEqualTo("smelled off");
         assertThat(body.path("deliveryDate").asText()).isEqualTo(T.minusDays(1).toString());
@@ -363,7 +354,6 @@ class FeedbackFlowIntegrationTest {
         assertThat(putIssues(feedbackId, "{\"issueCodes\":[\"HARD\"]}").getResponse().getStatus()).isEqualTo(400);
     }
 
-    // ------------------------------------------------------------------ cart
 
     @Test
     @DisplayName("Cart: tomorrow by default, any future date allowed, today / >30 days rejected, same day merges")
@@ -392,13 +382,12 @@ class FeedbackFlowIntegrationTest {
         long feedbackId = rate(C, next(C).path("prompt").path("promptId").asLong(), 5).path("feedbackId").asLong();
         JsonNode add = addToCart("{\"productId\":\"GHEE\",\"feedbackId\":" + feedbackId + "}", 201);
         assertThat(add.path("item").path("source").asText()).isEqualTo("FEEDBACK_BUY_AGAIN");
-        addToCart("{\"productId\":\"PANEER\",\"feedbackId\":" + feedbackId + "}", 400);   // wrong product
+        addToCart("{\"productId\":\"PANEER\",\"feedbackId\":" + feedbackId + "}", 400);
 
         JsonNode summary = getJson(get("/api/dashboard/summary"));
         assertThat(summary.path("totals").path("buyAgainAddsToCart").asLong()).isEqualTo(1);
     }
 
-    // ------------------------------------------------------------------ dashboard
 
     @Test
     @DisplayName("Dashboard groups by product, issue and area")
@@ -419,7 +408,6 @@ class FeedbackFlowIntegrationTest {
         JsonNode none = getJson(get("/api/dashboard/feedback").param("productId", "GHEE"));
         assertThat(none.path("totalElements").asLong()).isZero();
 
-        // Row carries pack size and starts as NEW; the quality team's follow-up is saved server-side.
         JsonNode row = rows.path("content").get(0);
         assertThat(row.path("productUnit").asText()).isEqualTo("1 unit");
         assertThat(row.path("followUpStatus").asText()).isEqualTo("NEW");
@@ -446,9 +434,7 @@ class FeedbackFlowIntegrationTest {
         assertThat(mvc.perform(get("/api/dashboard/summary")).andReturn().getResponse().getStatus()).isEqualTo(200);
     }
 
-    // ------------------------------------------------------------------ helpers
 
-    /** Pretends the request carries a valid login token for this customer (spring-security-test). */
     static RequestPostProcessor asCustomer(long customerId) {
         return jwt().jwt(j -> j.subject(String.valueOf(customerId)));
     }
@@ -461,7 +447,6 @@ class FeedbackFlowIntegrationTest {
         subscriptions.save(new Subscription(C, productId, status, T.minusDays(60), null));
     }
 
-    /** Delivers one item {@code daysAgo} days before T (negative = in the future relative to T). */
     private OrderItem deliver(int daysAgo, PurchaseType type, String productId) {
         CustomerOrder o = new CustomerOrder(C, T.minusDays(daysAgo), OrderStatus.DELIVERED, "Sector 45", "Gurugram");
         OrderItem item = o.addItem(productId, 1, BigDecimal.TEN, type);

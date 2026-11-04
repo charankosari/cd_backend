@@ -8,8 +8,9 @@ import java.util.Optional;
 
 public interface AddressRepository extends JpaRepository<Address, Long> {
 
-    /** Default address first, then oldest first. */
     List<Address> findByCustomerIdOrderByDefaultAddressDescIdAsc(Long customerId);
+
+    List<Address> findByCustomerIdOrderByDefaultAddressDescIdDesc(Long customerId);
 
     Optional<Address> findFirstByCustomerIdAndDefaultAddressTrue(Long customerId);
 

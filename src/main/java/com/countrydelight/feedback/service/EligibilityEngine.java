@@ -26,22 +26,6 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-/**
- * Pure "who / what / when" logic. Read-only: looks at a household's delivered items and decides, item by item,
- * whether we may ask for feedback today, and ranks the askable ones.
- *
- * <p>Rules, in the order they are checked for each delivered order item:
- * <ol>
- *   <li>Items delivered by a subscription are never asked about.</li>
- *   <li>Products without an X (feedbackDelayDays) are never asked about.</li>
- *   <li>If the household is subscribed to the product today (ACTIVE or PAUSED), we don't ask.</li>
- *   <li>Each delivered item is asked about at most once.</li>
- *   <li>Same product recently rated (30 days) or skipped / ignored (60 days): don't ask again.</li>
- *   <li>Ask from delivery + X days, until delivery + X + windowDays. Outside that window, don't ask.</li>
- * </ol>
- * Several eligible deliveries of the same product (bought twice before rating) are collapsed into one
- * candidate that points at the most recent delivery.
- */
 @Service
 public class EligibilityEngine {
 
@@ -73,7 +57,7 @@ public class EligibilityEngine {
 
     private static final Comparator<Candidate> RANKING = Comparator
             .comparingInt(Candidate::score).reversed()
-            .thenComparing(Candidate::expiresOn)          // about to expire first, so we don't lose it
+            .thenComparing(Candidate::expiresOn)
             .thenComparing(Candidate::dueOn)
             .thenComparing(c -> c.product().getId());
 
@@ -104,7 +88,6 @@ public class EligibilityEngine {
 
         List<FeedbackPrompt> history = prompts.findByCustomerIdOrderByIdAsc(customerId);
         Set<Long> askedItems = history.stream().map(FeedbackPrompt::getOrderItemId).collect(Collectors.toSet());
-        // Only our own open cards block a product. An abandoned "Rate now" (USER) must not block it forever.
         Set<String> pendingProducts = history.stream()
                 .filter(p -> p.getStatus() == PromptStatus.PENDING && !p.isUserInitiated())
                 .map(FeedbackPrompt::getProductId)
@@ -194,7 +177,6 @@ public class EligibilityEngine {
             List<OrderItem> group = e.getValue();
             Product product = productMap.get(pid);
 
-            // Bought twice before rating: ask once, about the most recent delivery (freshest in memory).
             OrderItem latest = group.stream()
                     .max(Comparator.comparing(OrderItem::deliveryDate).thenComparing(OrderItem::getId))
                     .orElseThrow();

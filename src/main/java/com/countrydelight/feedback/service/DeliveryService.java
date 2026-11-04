@@ -11,12 +11,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.util.List;
 
-/**
- * Stand-in for the real delivery system. Country Delight delivers in the morning, so a SCHEDULED order
- * counts as DELIVERED once its delivery date has arrived. It runs just before we read a customer's orders
- * or decide on a feedback card, so it also follows the demo clock (/api/admin/clock).
- * In production, the delivery app would set DELIVERED instead.
- */
 @Service
 public class DeliveryService {
 
@@ -32,14 +26,13 @@ public class DeliveryService {
 
     @Transactional
     public int markDueOrdersDelivered(Long customerId) {
-        subscriptionDeliveries.generateFor(customerId);          // today's subscription deliveries first
+        subscriptionDeliveries.generateFor(customerId);
         List<CustomerOrder> due = orders.findByCustomerIdAndStatusAndDeliveryDateLessThanEqual(
                 customerId, OrderStatus.SCHEDULED, time.today());
         due.forEach(CustomerOrder::markDelivered);
         return due.size();
     }
 
-    /** Same as above, for every customer (before the dashboard lists orders). */
     @Transactional
     public int markAllDueOrdersDelivered() {
         subscriptionDeliveries.generateAll();
@@ -48,11 +41,6 @@ public class DeliveryService {
         return due.size();
     }
 
-    /**
-     * "Mark delivered" from the dashboard: deliver now. If the order was planned for a later date, its delivery
-     * date becomes today, because that's when the customer actually received it. The X-day feedback wait then
-     * counts from today, and "Rate now" works immediately.
-     */
     @Transactional
     public CustomerOrder deliverNow(Long orderId) {
         CustomerOrder order = orders.findById(orderId).orElseThrow(() -> ApiException.notFound("Order " + orderId));

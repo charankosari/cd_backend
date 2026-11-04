@@ -9,7 +9,6 @@ import jakarta.persistence.Table;
 
 import java.time.Instant;
 
-/** A delivery address of a household. Each household has one default address. */
 @Entity
 @Table(name = "addresses")
 public class Address {
@@ -21,15 +20,12 @@ public class Address {
     @Column(nullable = false)
     private Long customerId;
 
-    /** "Home", "Work", "Parents' home"… */
     @Column(nullable = false, length = 30)
     private String label;
 
-    /** Flat / house number and building, e.g. "Flat 402, Tower B, Sunshine Residency". */
     @Column(length = 120)
     private String line1;
 
-    /** Street / road. */
     @Column(length = 120)
     private String line2;
 
@@ -81,7 +77,6 @@ public class Address {
         this.defaultAddress = defaultAddress;
     }
 
-    /** One line for orders / dashboard, e.g. "Flat 402, Tower B, Sunshine Residency, Golf Course Rd, Sector 45, Gurugram 122003". */
     public String fullText() {
         StringBuilder sb = new StringBuilder();
         for (String part : new String[]{line1, line2, landmark == null ? null : "near " + landmark, area}) {

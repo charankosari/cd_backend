@@ -34,7 +34,6 @@ public class CartItem {
     @Enumerated(EnumType.STRING)
     private CartItemSource source;
 
-    /** Set when the item came from the buy-again nudge, so we can measure conversion. */
     private Long feedbackId;
 
     private Instant createdAt;

@@ -11,7 +11,6 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
-/** Product catalog (open, no login needed). Images are served from /products/*. */
 @RestController
 @RequestMapping("/api/products")
 public class ProductController {

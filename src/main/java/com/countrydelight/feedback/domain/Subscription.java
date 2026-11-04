@@ -12,10 +12,6 @@ import jakarta.persistence.Table;
 import java.time.Instant;
 import java.time.LocalDate;
 
-/**
- * A recurring delivery plan: product, quantity, how often, where. Deliveries are created as orders
- * (purchase type SUBSCRIPTION) on each delivery day; subscribed products are never asked about in feedback.
- */
 @Entity
 @Table(name = "subscriptions")
 public class Subscription {
@@ -37,7 +33,6 @@ public class Subscription {
     @Column(nullable = false)
     private LocalDate startDate;
 
-    /** Set when cancelled (last day it counted). */
     private LocalDate endDate;
 
     private int quantity = 1;
@@ -51,10 +46,6 @@ public class Subscription {
     @Column(length = 300)
     private String deliveryAddress;
 
-    /**
-     * Deliveries have been created up to and including this day. Null = never generated: then deliveries start
-     * from today (no back-filling of history for older plans).
-     */
     private LocalDate lastGeneratedOn;
 
     private Instant createdAt;
@@ -70,7 +61,6 @@ public class Subscription {
         this.endDate = endDate;
     }
 
-    /** A new plan from the app: first delivery on startDate. */
     public static Subscription create(Long customerId, String productId, int quantity, SubscriptionFrequency frequency,
                                       LocalDate startDate, Instant createdAt) {
         Subscription s = new Subscription(customerId, productId, SubscriptionStatus.ACTIVE, startDate, null);
@@ -81,19 +71,16 @@ public class Subscription {
         return s;
     }
 
-    /** True if the customer counts as "subscribed" to this product on the given date (ACTIVE or PAUSED). */
     public boolean coversDate(LocalDate date) {
         return status != SubscriptionStatus.CANCELLED
                 && !startDate.isAfter(date)
                 && (endDate == null || !endDate.isBefore(date));
     }
 
-    /** Active, and this is one of its delivery days. */
     public boolean deliversOn(LocalDate date) {
         return status == SubscriptionStatus.ACTIVE && frequency.deliversOn(startDate, date);
     }
 
-    /** First day deliveries still need to be created for (see lastGeneratedOn). */
     public LocalDate generateFrom(LocalDate today) {
         if (lastGeneratedOn != null) {
             return lastGeneratedOn.plusDays(1);
@@ -101,7 +88,6 @@ public class Subscription {
         return startDate.isAfter(today) ? startDate : today;
     }
 
-    /** Next delivery after today (null when paused or cancelled). */
     public LocalDate nextDelivery(LocalDate today) {
         if (status != SubscriptionStatus.ACTIVE) {
             return null;
@@ -133,7 +119,6 @@ public class Subscription {
         this.status = SubscriptionStatus.PAUSED;
     }
 
-    /** Resume: deliveries continue from tomorrow; paused days are not delivered later. */
     public void resume(LocalDate today) {
         this.status = SubscriptionStatus.ACTIVE;
         markGeneratedUpTo(today);

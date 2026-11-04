@@ -14,11 +14,6 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
-/**
- * A household's delivery addresses. Rules: max 10 per household, always exactly one default
- * (the first address becomes default; deleting the default promotes the oldest remaining one), and the
- * last address can't be deleted (checkout needs somewhere to deliver).
- */
 @Service
 public class AddressService {
 
@@ -35,7 +30,7 @@ public class AddressService {
     @Transactional(readOnly = true)
     public AddressList list(Long customerId) {
         requireCustomer(customerId);
-        List<AddressView> views = addresses.findByCustomerIdOrderByDefaultAddressDescIdAsc(customerId).stream()
+        List<AddressView> views = addresses.findByCustomerIdOrderByDefaultAddressDescIdDesc(customerId).stream()
                 .map(AddressService::view).toList();
         Long defaultId = views.stream().filter(AddressView::isDefault).map(AddressView::addressId).findFirst().orElse(null);
         return new AddressList(views, defaultId);
@@ -95,7 +90,6 @@ public class AddressService {
         return list(customerId);
     }
 
-    /** For checkout: the chosen address (must be the customer's), else the default one. */
     @Transactional(readOnly = true)
     public Optional<Address> forDelivery(Long customerId, Long addressId) {
         if (addressId != null) {

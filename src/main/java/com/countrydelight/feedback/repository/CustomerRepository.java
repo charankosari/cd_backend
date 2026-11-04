@@ -19,10 +19,6 @@ public interface CustomerRepository extends JpaRepository<Customer, Long> {
 
     boolean existsByPhone(String phone);
 
-    /**
-     * Inserts a customer with a FIXED id (demo / test data only). Normal signups use save(),
-     * which takes the id from the database sequence instead.
-     */
     @Transactional
     @Modifying
     @Query(value = "insert into customers (id, name, phone, area, city, demo_scenario, created_at) "

@@ -31,7 +31,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 
-/** Address book rules, and checkout delivering to the chosen / default address. */
 @SpringBootTest(properties = {"app.seed.enabled=false"})
 @AutoConfigureMockMvc
 class AddressesTest {
@@ -75,10 +74,10 @@ class AddressesTest {
 
         JsonNode after = call(post("/api/addresses/" + work + "/default"), null, C, 200);
         assertThat(after.path("defaultAddressId").asLong()).isEqualTo(work);
-        assertThat(after.path("addresses").get(0).path("addressId").asLong()).isEqualTo(work);    // default listed first
+        assertThat(after.path("addresses").get(0).path("addressId").asLong()).isEqualTo(work);
 
         JsonNode removed = call(delete("/api/addresses/" + work), null, C, 200);
-        assertThat(removed.path("defaultAddressId").asLong()).isEqualTo(home);                     // promoted
+        assertThat(removed.path("defaultAddressId").asLong()).isEqualTo(home);
         assertThat(call(delete("/api/addresses/" + home), null, C, 409).path("code").asText()).isEqualTo("LAST_ADDRESS");
 
         long third = add("Parents' home", "Sohna Road", "122018", true).path("addressId").asLong();
@@ -93,10 +92,10 @@ class AddressesTest {
                 body("Home", "Flat 2", "Sector 56", "122011", false), C, 200);
         assertThat(edited.path("area").asText()).isEqualTo("Sector 56");
 
-        call(post("/api/addresses"), body("Home", "Flat 1", "Sector 45", "12345", false), C, 400);   // bad pincode
-        call(post("/api/addresses"), "{\"label\":\"Home\"}", C, 400);                               // missing fields
-        call(put("/api/addresses/" + id), body("X", "Y", "Z", "122001", false), OTHER, 404);         // not theirs
-        call(get("/api/addresses"), null, null, 401);                                                // login needed
+        call(post("/api/addresses"), body("Home", "Flat 1", "Sector 45", "12345", false), C, 400);
+        call(post("/api/addresses"), "{\"label\":\"Home\"}", C, 400);
+        call(put("/api/addresses/" + id), body("X", "Y", "Z", "122001", false), OTHER, 404);
+        call(get("/api/addresses"), null, null, 401);
     }
 
     @Test
@@ -113,10 +112,10 @@ class AddressesTest {
         call(post("/api/cart/items"), "{\"productId\":\"PANEER\"}", C, 201);
         JsonNode toWork = call(post("/api/orders"), "{\"addressId\":" + work + "}", C, 201).path("orders").get(0);
         assertThat(toWork.path("addressId").asLong()).isEqualTo(work);
-        assertThat(toWork.path("area").asText()).isEqualTo("DLF Phase 3");          // quality dashboard area follows it
+        assertThat(toWork.path("area").asText()).isEqualTo("DLF Phase 3");
 
         call(post("/api/cart/items"), "{\"productId\":\"PANEER\"}", C, 201);
-        call(post("/api/orders"), "{\"addressId\":" + work + "}", OTHER, 404);       // someone else's address
+        call(post("/api/orders"), "{\"addressId\":" + work + "}", OTHER, 404);
     }
 
     @Test
@@ -136,7 +135,6 @@ class AddressesTest {
         }
     }
 
-    // ------------------------------------------------------------------ helpers
 
     private JsonNode add(String label, String area, String pincode, boolean makeDefault) throws Exception {
         return call(post("/api/addresses"), body(label, "Flat 1", area, pincode, makeDefault), C, 201);

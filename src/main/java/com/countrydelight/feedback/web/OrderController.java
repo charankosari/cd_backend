@@ -26,7 +26,6 @@ public class OrderController {
         this.orders = orders;
     }
 
-    /** Checkout: turn the cart into orders (one per delivery date). Body is optional. */
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public PlaceOrderResponse place(@CurrentCustomer Long customerId,
@@ -35,7 +34,6 @@ public class OrderController {
                 body == null ? null : body.addressId());
     }
 
-    /** My orders, newest first, with each item's feedback state. */
     @GetMapping
     public List<OrderView> list(@CurrentCustomer Long customerId) {
         return orders.list(customerId);

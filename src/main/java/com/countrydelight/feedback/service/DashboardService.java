@@ -40,16 +40,10 @@ import java.util.TreeSet;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-/**
- * Aggregations for the quality dashboard. Done in memory over the filtered rows: fine for the demo's
- * volume. In production this would be SQL GROUP BYs on a read replica or warehouse.
- */
 @Service
 public class DashboardService {
 
     private static final int DEFAULT_RANGE_DAYS = 30;
-    // Hotspot needs enough data to not be noise: >= 8 ratings in the cell, >= 3 of them low, >= 35% low,
-    // and at least 2x the low rate of the same product in other areas.
     private static final int HOTSPOT_MIN_SAMPLES = 8;
     private static final int HOTSPOT_MIN_LOW = 3;
     private static final double HOTSPOT_MIN_LOW_PCT = 35.0;
@@ -99,7 +93,6 @@ public class DashboardService {
                 alerts(rows, spikeRows, r, products, labels));
     }
 
-    // ---------------------------------------------------------------- aggregations
 
     private Totals totals(List<Feedback> rows) {
         long n = rows.size();
@@ -183,13 +176,11 @@ public class DashboardService {
         return out;
     }
 
-    // ---------------------------------------------------------------- pattern detection
 
     private List<Alert> alerts(List<Feedback> rows, List<Feedback> spikeRows, Range r,
                                Map<String, Product> products, Map<String, String> labels) {
         List<Alert> alerts = new ArrayList<>();
 
-        // 1. HOTSPOT: a product does much worse in one area than everywhere else.
         Map<String, List<Feedback>> byProduct = rows.stream().collect(Collectors.groupingBy(Feedback::getProductId));
         byProduct.forEach((pid, list) -> {
             Map<String, List<Feedback>> byArea = list.stream().collect(Collectors.groupingBy(Feedback::getArea));
@@ -215,7 +206,6 @@ public class DashboardService {
             });
         });
 
-        // 2. ISSUE_SPIKE: an issue reported much more in the last 7 days than the 7 days before.
         LocalDate recentFrom = r.to().minusDays(6);
         Map<String, long[]> spike = new TreeMap<>();
         Map<String, Map<String, Long>> spikeAreas = new LinkedHashMap<>();
@@ -248,7 +238,6 @@ public class DashboardService {
             }
         });
 
-        // 3. PRODUCT_QUALITY: a product is doing badly overall.
         byProduct.forEach((pid, list) -> {
             long low = list.stream().filter(this::isLow).count();
             double lowPct = pct(low, list.size());
@@ -266,7 +255,6 @@ public class DashboardService {
         return alerts;
     }
 
-    // ---------------------------------------------------------------- list + filters
 
     @Transactional(readOnly = true)
     public Page<FeedbackRow> list(LocalDate from, LocalDate to, String productId, String area, String issueCode,
@@ -293,7 +281,6 @@ public class DashboardService {
         return new Page<>(content, page, size, rows.size(), totalPages);
     }
 
-    /** Quality team sets status (New / In progress / Resolved) and an internal note on one feedback. */
     @Transactional
     public FeedbackRow updateFollowUp(Long feedbackId, FollowUpStatus status, String internalNote) {
         Feedback f = feedbacks.findById(feedbackId).orElseThrow(() -> ApiException.notFound("Feedback " + feedbackId));
@@ -333,7 +320,6 @@ public class DashboardService {
         return new Filters(products, areas);
     }
 
-    // ---------------------------------------------------------------- helpers
 
     private Range range(LocalDate from, LocalDate to) {
         LocalDate t = to != null ? to : time.today();
