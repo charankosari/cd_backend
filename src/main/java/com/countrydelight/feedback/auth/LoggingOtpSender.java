@@ -4,7 +4,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
-/** Stand-in for an SMS gateway: writes a log line instead of sending a message. Never logs the code. */
 @Component
 public class LoggingOtpSender implements OtpSender {
 

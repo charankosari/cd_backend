@@ -54,7 +54,6 @@ public class AdminController {
         this.promptService = promptService;
     }
 
-    // ---------------------------------------------------------------- clock
 
     public record ClockResponse(LocalDate today, boolean overridden) {
     }

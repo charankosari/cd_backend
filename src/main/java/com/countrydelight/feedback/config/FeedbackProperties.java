@@ -3,9 +3,7 @@ package com.countrydelight.feedback.config;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
 
-/**
- * Tunable rules for when/how often we ask for feedback. See application.yml for explanations.
- */
+
 @ConfigurationProperties(prefix = "feedback")
 public record FeedbackProperties(
         @DefaultValue("3") int windowDays,

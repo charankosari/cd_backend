@@ -10,15 +10,6 @@ import com.countrydelight.feedback.web.dto.AuthDtos.RegisterRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
-/**
- * Login and signup flow:
- * <pre>
- *   1. POST /api/auth/otp/request {phone}            -> OTP "sent"; tells the app if the number is registered
- *   2a. POST /api/auth/login {phone, otp}            -> existing user: token
- *   2b. POST /api/auth/register {phone, otp, name..} -> new user: create account + token
- *   3. Every other call: header  Authorization: Bearer token
- * </pre>
- */
 @Service
 public class AuthService {
 
@@ -45,7 +36,6 @@ public class AuthService {
 
     public AuthResponse login(String rawPhone, String otp) {
         String phone = PhoneNumbers.normalize(rawPhone);
-        // Check the account first, so an unregistered number doesn't use up its OTP.
         Customer customer = customerService.findByPhone(phone)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "NOT_REGISTERED",
                         "No account for this number. Sign up first"));

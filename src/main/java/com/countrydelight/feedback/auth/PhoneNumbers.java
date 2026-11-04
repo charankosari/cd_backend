@@ -4,7 +4,6 @@ import com.countrydelight.feedback.common.ApiException;
 
 import java.util.regex.Pattern;
 
-/** Indian mobile number helpers. Everything is stored as 10 digits, e.g. "9876543210". */
 public final class PhoneNumbers {
 
     private static final Pattern INDIAN_MOBILE = Pattern.compile("^[6-9]\\d{9}$");
@@ -12,7 +11,6 @@ public final class PhoneNumbers {
     private PhoneNumbers() {
     }
 
-    /** Accepts "98765 43210", "+91 9876543210", "09876543210" and returns "9876543210". */
     public static String normalize(String raw) {
         if (raw == null) {
             throw ApiException.badRequest("INVALID_PHONE", "Phone number is required");
@@ -29,7 +27,6 @@ public final class PhoneNumbers {
         return digits;
     }
 
-    /** "9876543210" becomes "******3210", safe to print in logs. */
     public static String mask(String phone) {
         return phone == null || phone.length() < 4 ? "****" : "******" + phone.substring(phone.length() - 4);
     }

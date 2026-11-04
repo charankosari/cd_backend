@@ -4,12 +4,7 @@ import org.springframework.stereotype.Component;
 
 import java.security.SecureRandom;
 
-/**
- * Creates OTP codes.
- * - Real mode: a random N-digit code from SecureRandom (unpredictable, safe for security use).
- * - Fixed mode (now, because we have no SMS provider): always app.auth.otp.fixed-code, e.g. 123456.
- * Switching modes is config only: set OTP_FIXED_CODE to empty.
- */
+
 @Component
 public class OtpCodeGenerator {
 

@@ -2,7 +2,6 @@ package com.countrydelight.feedback.auth;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
-/** Everything under "app.auth" in application.yml. */
 @ConfigurationProperties(prefix = "app.auth")
 public record AuthProperties(Jwt jwt, Otp otp) {
 

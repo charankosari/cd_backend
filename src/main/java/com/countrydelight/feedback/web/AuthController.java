@@ -27,26 +27,22 @@ public class AuthController {
         this.auth = auth;
     }
 
-    /** Open. Sends an OTP (today: always the fixed code, 123456). */
     @PostMapping("/otp/request")
     public OtpRequestResponse requestOtp(@Valid @RequestBody OtpRequest body) {
         return auth.requestOtp(body.phone());
     }
 
-    /** Open. Existing user: phone + OTP gives a token. */
     @PostMapping("/login")
     public AuthResponse login(@Valid @RequestBody LoginRequest body) {
         return auth.login(body.phone(), body.otp());
     }
 
-    /** Open. New user: phone + OTP + profile creates the account and returns a token. */
     @PostMapping("/register")
     @ResponseStatus(HttpStatus.CREATED)
     public AuthResponse register(@Valid @RequestBody RegisterRequest body) {
         return auth.register(body);
     }
 
-    /** Needs a token. Who am I? */
     @GetMapping("/me")
     public CustomerProfile me(@CurrentCustomer Long customerId) {
         return auth.me(customerId);

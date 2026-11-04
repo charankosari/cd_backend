@@ -23,11 +23,9 @@ public class WebConfig implements WebMvcConfigurer {
 
     @Override
     public void addCorsMappings(CorsRegistry registry) {
-        // Open CORS so the RN app (Expo web / dev servers) and a separately hosted dashboard can call us.
         registry.addMapping("/**").allowedOriginPatterns("*").allowedMethods("*").allowedHeaders("*");
     }
 
-    /** Teaches Spring how to fill controller parameters marked @CurrentCustomer. */
     @Override
     public void addArgumentResolvers(List<HandlerMethodArgumentResolver> resolvers) {
         resolvers.add(new CurrentCustomerArgumentResolver());

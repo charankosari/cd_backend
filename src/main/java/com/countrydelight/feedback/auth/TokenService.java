@@ -11,14 +11,6 @@ import org.springframework.stereotype.Service;
 import java.time.Duration;
 import java.time.Instant;
 
-/**
- * Creates the login token (a JWT) after a successful OTP check.
- *
- * <p>A JWT has 3 parts, header.payload.signature. The payload (claims) says who the user is
- * (sub = customer id) and when the token expires. The signature is made with JWT_SECRET, so if anyone
- * edits the payload (e.g. changes sub to another customer), the signature no longer matches
- * and SecurityConfig rejects the token.
- */
 @Service
 public class TokenService {
 
@@ -40,7 +32,7 @@ public class TokenService {
                 .issuer(config.issuer())
                 .issuedAt(now)
                 .expiresAt(now.plus(ttl))
-                .subject(String.valueOf(customer.getId()))   // who: read back by @CurrentCustomer
+                .subject(String.valueOf(customer.getId()))  
                 .claim("phone", customer.getPhone())
                 .claim("role", "CUSTOMER")
                 .build();

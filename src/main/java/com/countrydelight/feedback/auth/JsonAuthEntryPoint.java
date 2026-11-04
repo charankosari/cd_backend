@@ -13,10 +13,7 @@ import org.springframework.stereotype.Component;
 import java.io.IOException;
 import java.time.Instant;
 
-/**
- * What the security filter answers when a protected URL is called without a valid token.
- * Same JSON shape as all our other errors, so the app handles it the same way (go to login).
- */
+
 @Component
 public class JsonAuthEntryPoint implements AuthenticationEntryPoint {
 

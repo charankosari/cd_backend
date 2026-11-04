@@ -10,11 +10,7 @@ import org.springframework.web.context.request.NativeWebRequest;
 import org.springframework.web.method.support.HandlerMethodArgumentResolver;
 import org.springframework.web.method.support.ModelAndViewContainer;
 
-/**
- * Supplies the value for {@code @CurrentCustomer Long customerId}.
- * By the time a controller runs, the security filter has already verified the token and stored it
- * in the SecurityContext; we just read the "sub" (subject) claim, which holds the customer id.
- */
+
 public class CurrentCustomerArgumentResolver implements HandlerMethodArgumentResolver {
 
     @Override
