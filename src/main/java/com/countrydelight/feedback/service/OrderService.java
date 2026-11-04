@@ -2,6 +2,7 @@ package com.countrydelight.feedback.service;
 
 import com.countrydelight.feedback.common.ApiException;
 import com.countrydelight.feedback.common.TimeProvider;
+import com.countrydelight.feedback.domain.Address;
 import com.countrydelight.feedback.domain.CartItem;
 import com.countrydelight.feedback.domain.Customer;
 import com.countrydelight.feedback.domain.CustomerOrder;
@@ -41,10 +42,11 @@ public class OrderService {
     private final CatalogService catalog;
     private final DeliveryService deliveries;
     private final TimeProvider time;
+    private final AddressService addresses;
 
     public OrderService(OrderRepository orders, CartItemRepository cart, CustomerRepository customers,
                         FeedbackRepository feedbacks, CatalogService catalog, DeliveryService deliveries,
-                        TimeProvider time) {
+                        TimeProvider time, AddressService addresses) {
         this.orders = orders;
         this.cart = cart;
         this.customers = customers;
@@ -52,17 +54,20 @@ public class OrderService {
         this.catalog = catalog;
         this.deliveries = deliveries;
         this.time = time;
+        this.addresses = addresses;
     }
 
     /**
      * Turns the cart into orders: one order per delivery date, status SCHEDULED, then empties those cart lines.
-     * onlyDate (optional) = place only the lines for that date.
+     * onlyDate (optional) = place only the lines for that date. addressId (optional) = deliver there; otherwise the
+     * household's default address.
      */
     @Transactional
-    public PlaceOrderResponse placeFromCart(Long customerId, LocalDate onlyDate) {
+    public PlaceOrderResponse placeFromCart(Long customerId, LocalDate onlyDate, Long addressId) {
         Customer customer = customers.findById(customerId)
                 .orElseThrow(() -> ApiException.notFound("Customer " + customerId));
         LocalDate today = time.today();
+        Address deliverTo = addresses.forDelivery(customerId, addressId).orElse(null);   // 404 if not theirs
 
         List<CartItem> lines = cart.findByCustomerIdOrderByDeliveryDateAscIdAsc(customerId).stream()
                 .filter(l -> onlyDate == null || l.getDeliveryDate().equals(onlyDate))
@@ -82,6 +87,9 @@ public class OrderService {
         byDate.forEach((date, dayLines) -> {
             CustomerOrder order = new CustomerOrder(customerId, date, OrderStatus.SCHEDULED,
                     customer.getArea(), customer.getCity());
+            if (deliverTo != null) {
+                order.deliverTo(deliverTo);
+            }
             for (CartItem line : dayLines) {
                 order.addItem(line.getProductId(), line.getQuantity(), catalog.product(line.getProductId()).getPrice(),
                         PurchaseType.ONE_TIME);
@@ -133,7 +141,7 @@ public class OrderService {
         int qty = items.stream().mapToInt(OrderItemView::quantity).sum();
         BigDecimal total = items.stream().map(OrderItemView::lineTotal).reduce(BigDecimal.ZERO, BigDecimal::add);
         return new OrderView(o.getId(), o.getDeliveryDate(), o.getStatus().name(), o.getArea(), o.getCity(),
-                qty, total, items);
+                qty, total, items, o.getAddressId(), o.getDeliveryAddress());
     }
 
     private OrderItemView itemView(CustomerOrder o, OrderItem i, Feedback feedback) {

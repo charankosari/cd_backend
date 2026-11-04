@@ -31,7 +31,8 @@ public class OrderController {
     @ResponseStatus(HttpStatus.CREATED)
     public PlaceOrderResponse place(@CurrentCustomer Long customerId,
                                     @RequestBody(required = false) PlaceOrderRequest body) {
-        return orders.placeFromCart(customerId, body == null ? null : body.deliveryDate());
+        return orders.placeFromCart(customerId, body == null ? null : body.deliveryDate(),
+                body == null ? null : body.addressId());
     }
 
     /** My orders, newest first, with each item's feedback state. */

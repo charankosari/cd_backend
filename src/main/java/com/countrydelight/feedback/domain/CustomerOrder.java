@@ -41,6 +41,12 @@ public class CustomerOrder {
     @Column(nullable = false)
     private String city;
 
+    /** The address it was delivered to (snapshot of the text, so later edits don't change history). */
+    private Long addressId;
+
+    @Column(length = 300)
+    private String deliveryAddress;
+
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<OrderItem> items = new ArrayList<>();
 
@@ -61,8 +67,25 @@ public class CustomerOrder {
         return item;
     }
 
+    /** Deliver to this address: area/city (used by the quality dashboard) and the full address text. */
+    public void deliverTo(Address address) {
+        this.addressId = address.getId();
+        this.area = address.getArea();
+        this.city = address.getCity();
+        this.deliveryAddress = address.fullText();
+    }
+
+    public Long getAddressId() { return addressId; }
+    public String getDeliveryAddress() { return deliveryAddress; }
+
     public void markDelivered() {
         this.status = OrderStatus.DELIVERED;
+    }
+
+    /** Delivered on a specific day (e.g. "Mark delivered" on the dashboard before the planned date). */
+    public void markDeliveredOn(LocalDate date) {
+        this.status = OrderStatus.DELIVERED;
+        this.deliveryDate = date;
     }
 
     public Long getId() { return id; }

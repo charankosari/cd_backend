@@ -57,6 +57,14 @@ public class CartItem {
         this.quantity += more;
     }
 
+    public void setQuantity(int quantity) {
+        this.quantity = quantity;
+    }
+
+    public void setDeliveryDate(LocalDate deliveryDate) {
+        this.deliveryDate = deliveryDate;
+    }
+
     public Long getId() { return id; }
     public Long getCustomerId() { return customerId; }
     public String getProductId() { return productId; }

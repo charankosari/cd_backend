@@ -40,7 +40,7 @@ public class ProductController {
 
     private ProductView view(Product p) {
         return new ProductView(p.getId(), p.getName(), p.getDescription(), p.getCategory(), p.getUnit(), p.getPrice(),
-                catalog.imageUrl(p), p.getFeedbackDelayDays() != null, p.getFeedbackDelayDays(),
+                catalog.imageUrl(p), p.getFeedbackDelayDays() != null, p.isSubscribable(), p.getFeedbackDelayDays(),
                 catalog.issueOptions(p.getId()));
     }
 }

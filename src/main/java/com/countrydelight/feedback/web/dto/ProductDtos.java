@@ -19,6 +19,7 @@ public final class ProductDtos {
                               BigDecimal price,
                               String imageUrl,            // full URL, load directly
                               boolean feedbackEnabled,    // false = we never ask about it (e.g. milk)
+                              boolean subscribable,       // can be bought as a subscription (atta, honey: no)
                               Integer feedbackDelayDays,  // X: days after delivery we ask
                               List<IssueOptionDto> issueOptions) {
     }

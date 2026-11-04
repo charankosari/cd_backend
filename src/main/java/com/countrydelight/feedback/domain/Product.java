@@ -38,6 +38,9 @@ public class Product {
     /** Dairy, Bakery, Staples… for grouping in the app. */
     private String category;
 
+    /** Can be bought as a daily / alternate-day subscription (milk yes, atta no). */
+    private boolean subscribable = true;
+
     protected Product() {
     }
 
@@ -66,5 +69,8 @@ public class Product {
     public String getDescription() { return description; }
     public String getCategory() { return category; }
 
+    public boolean isSubscribable() { return subscribable; }
+
     public void setFeedbackDelayDays(Integer feedbackDelayDays) { this.feedbackDelayDays = feedbackDelayDays; }
+    public void setSubscribable(boolean subscribable) { this.subscribable = subscribable; }
 }

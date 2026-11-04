@@ -15,4 +15,7 @@ public interface CartItemRepository extends JpaRepository<CartItem, Long> {
     Optional<CartItem> findFirstByCustomerIdAndProductIdAndDeliveryDate(Long customerId, String productId, LocalDate date);
 
     long countByFeedbackIdIn(Collection<Long> feedbackIds);
+
+    /** Dashboard "Carts": lines still waiting to be ordered (delivery date tomorrow or later). */
+    List<CartItem> findByDeliveryDateAfterOrderByCustomerIdAscDeliveryDateAscIdAsc(LocalDate date);
 }

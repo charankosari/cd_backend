@@ -10,7 +10,7 @@ public final class OrderDtos {
     }
 
     /** POST /api/orders. Body optional; deliveryDate = only order the cart lines for that date. */
-    public record PlaceOrderRequest(LocalDate deliveryDate) {
+    public record PlaceOrderRequest(LocalDate deliveryDate, Long addressId) {
     }
 
     public record PlaceOrderResponse(List<OrderView> orders, String message) {
@@ -23,7 +23,9 @@ public final class OrderDtos {
                             String city,
                             int totalQuantity,
                             BigDecimal totalAmount,
-                            List<OrderItemView> items) {
+                            List<OrderItemView> items,
+                            Long addressId,
+                            String deliveryAddress) {    // full address text it was / will be delivered to
     }
 
     public record OrderItemView(Long orderItemId,

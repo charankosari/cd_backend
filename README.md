@@ -106,6 +106,10 @@ Log in as any of them with phone **`9000000` + ID** (e.g. `9000000106`) and OTP 
 | 108 | Priya | Repeat Bread + first-time Ghee both due | **Ghee** first (new to household beats repeat) |
 | 109 | Arjun | Paneer card seen on 3 days, never tapped | Paneer → **IGNORED**; cap until today+2, then Dahi |
 | 110 | Sara | Ghee subscription **paused**, bought a Ghee jar | nothing (paused = still subscribed) |
+| 201 | Ravi | **Subscriber** (Milk, Dahi, Paneer) + one-time Paneer extra; rated Paneer 5★ before subscribing | nothing; buy-again leaves Paneer out (`SUBSCRIBED`) |
+| 202 | Anjali | **Happy:** rated Ghee 5★, Paneer 4★; Dahi delivered yesterday | **Dahi** card; buy-again: **Ghee, Paneer** |
+| 204 | Pooja | **Subscribed + ordered:** subscribed to Dahi and Milk; got Paneer (one-time) and an extra Dahi yesterday | **Paneer** card only. Dahi is never asked (`SUBSCRIBED`) |
+| 203 | Karan | **Mixed:** Bread 2★, Atta 3★, Eggs 5★; Coconut water delivered yesterday | **Coconut water** card; buy-again: **Eggs** only (Bread, Atta `RATED_LOW`) |
 
 Plus 60 households in 6 areas (Gurugram: Sector 45, DLF Phase 3, Sohna Road; Bengaluru: Indiranagar,
 Koramangala, HSR Layout) with ~350 past ratings. Three quality problems are planted for the dashboard to find:
@@ -246,7 +250,36 @@ Multipart, field `file`. JPEG/PNG/WEBP/HEIC, max 5 MB → `{"feedbackId": 349, "
 - Adding the same product for the same date bumps the quantity.
 - Returns `201` with `{item, message: "Desi Cow Ghee added for tomorrow", cart}`.
 
-`GET /api/cart`, `DELETE /api/cart/items/{id}`, `GET /api/auth/me`.
+`GET /api/cart`, `DELETE /api/cart/items/{id}`, `PATCH /api/cart/items/{id}` (quantity / date; merges with an existing
+line for that date), `DELETE /api/cart` (clear), `GET /api/cart/summary` (badge), `GET /api/auth/me`.
+
+### Addresses
+`GET/POST /api/addresses`, `PUT/DELETE /api/addresses/{id}`, `POST /api/addresses/{id}/default` (token). Each household
+has exactly one default address (max 10; the last one can't be deleted; deleting the default promotes the oldest).
+Checkout takes an optional `addressId` (else the default). Each order stores `addressId`, the full `deliveryAddress`
+text, and the address's area/city, so the quality dashboard's per-area view follows where it was actually delivered.
+Seed: every household has a Home address; demo accounts 101–110 and 201–204 have 4–5 (Home, Work, Parents' home,
+Weekend home, Friend's place) using real Gurugram/Bengaluru areas and pincodes. Signups get a Home address from
+their signup area/city.
+
+### Subscriptions
+`GET/POST /api/subscriptions`, `PATCH/DELETE /api/subscriptions/{id}`, `POST /api/subscriptions/{id}/pause|resume`
+(token). Plan = product, quantity (1–10), `DAILY` or `ALTERNATE_DAYS`, start date (tomorrow … +30), address.
+One live plan per product; Atta and Honey aren't subscribable. `SubscriptionDeliveryService` creates each delivery
+day's morning order (`SUBSCRIPTION` items, one order per household per day per address) whenever orders or feedback
+are read, so it follows the demo clock. Paused = still subscribed (no feedback asks), no deliveries; resume continues
+from tomorrow. Seeded plans: Rohan (Milk ×2, Dahi), Ravi (Milk ×2, Dahi, Paneer alternate days), Pooja (Milk, Dahi),
+Sara (Ghee, paused).
+
+### Goes well with your cart
+`GET /api/recommendations/for-cart` (token): up to 4 products that pair with the cart (hand-picked pairs in
+`ProductPairings`, e.g. Bread → Butter, Eggs, Honey). Products the user rated 4–5★ come first; in-cart, low-rated
+(latest 1–3★) and subscribed products are left out. `suggestedDate` = delivery date of the cart line it pairs with.
+
+### Buy-again recommendations
+`GET /api/recommendations/buy-again` (token): products the user's **latest** rating put at **4–5★**, with image, price and
+`feedbackId` for one-tap reorder. Left out: latest rating 1–3★ (`RATED_LOW`), subscribed active/paused (`SUBSCRIBED`),
+already in the cart (`IN_CART`). Ratings from the last 90 days. The `excluded` list is for testing only.
 
 ### Orders
 - `POST /api/orders` (body optional: `{"deliveryDate": "..."}`): checkout. Cart lines become one `SCHEDULED` order per delivery date, and the cart is emptied.
@@ -282,6 +315,13 @@ Filters are optional on every endpoint: `from`, `to` (delivery dates, default la
   - `alerts`: the patterns below
 - `GET /api/dashboard/feedback?issueCode=&maxRating=&page=&size=`: individual rows for tracing (order id, delivery date, area, note, photo).
 - `GET /api/dashboard/filters`: products with their chips, and areas.
+- `GET /api/dashboard/orders?status=SCHEDULED|DELIVERED|CANCELLED|ALL&page=&size=`: every customer's orders (customer name,
+  area, items, total, `canMarkDelivered`) plus `counts` per status. To-deliver orders come soonest first.
+- `GET /api/dashboard/carts`: live carts (lines for tomorrow or later) grouped by customer, with totals; buy-again lines
+  are marked `FEEDBACK_BUY_AGAIN`.
+- `POST /api/dashboard/orders/{orderId}/deliver`: **Mark delivered**. Delivers a scheduled order now; if it was planned for a
+  later day, its delivery date becomes today, so the X-day feedback wait starts today and "Rate now" works at once.
+  `409 ALREADY_DELIVERED` / `ORDER_CANCELLED`, `404` unknown order.
 - `PUT /api/dashboard/feedback/{feedbackId}/follow-up` `{"status": "NEW" | "IN_PROGRESS" | "RESOLVED", "internalNote": "..."}`
   (note ≤ 1000 chars, internal only): the quality team's handling of a feedback, shared by everyone on the team.
   Returns the updated row. Each feedback row also carries `productUnit`, `followUpStatus`, `internalNote` and `followUpUpdatedAt`.

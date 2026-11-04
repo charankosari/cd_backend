@@ -14,6 +14,8 @@ import com.countrydelight.feedback.web.dto.CartDtos.AddToCartRequest;
 import com.countrydelight.feedback.web.dto.CartDtos.AddToCartResponse;
 import com.countrydelight.feedback.web.dto.CartDtos.CartItemResponse;
 import com.countrydelight.feedback.web.dto.CartDtos.CartResponse;
+import com.countrydelight.feedback.web.dto.CartDtos.CartSummary;
+import com.countrydelight.feedback.web.dto.CartDtos.UpdateCartItemRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -49,13 +51,7 @@ public class CartService {
         Product product = catalog.product(req.productId());
         LocalDate today = time.today();
         LocalDate date = req.deliveryDate() != null ? req.deliveryDate() : today.plusDays(1);
-        if (!date.isAfter(today)) {
-            throw ApiException.badRequest("INVALID_DELIVERY_DATE", "Delivery date must be tomorrow or later");
-        }
-        LocalDate max = today.plusDays(props.buyAgainMaxDaysAhead());
-        if (date.isAfter(max)) {
-            throw ApiException.badRequest("INVALID_DELIVERY_DATE", "Delivery date must be on or before " + max);
-        }
+        checkDeliveryDate(date, today);
         int qty = req.quantity() == null ? 1 : req.quantity();
 
         CartItemSource source = CartItemSource.MANUAL;
@@ -97,12 +93,82 @@ public class CartService {
 
     @Transactional
     public CartResponse remove(Long customerId, Long cartItemId) {
-        CartItem item = cart.findById(cartItemId)
-                .filter(i -> i.getCustomerId().equals(customerId))
-                .orElseThrow(() -> ApiException.notFound("Cart item " + cartItemId));
+        CartItem item = owned(customerId, cartItemId);
         cart.delete(item);
         cart.flush();
         return view(customerId);
+    }
+
+    /**
+     * Change a line's quantity and/or delivery date. Moving it to a date that already has the same product
+     * merges the two lines (quantities added), so the cart never shows duplicates.
+     */
+    @Transactional
+    public AddToCartResponse update(Long customerId, Long cartItemId, UpdateCartItemRequest req) {
+        if (req.quantity() == null && req.deliveryDate() == null) {
+            throw ApiException.badRequest("NOTHING_TO_UPDATE", "Send quantity and/or deliveryDate");
+        }
+        CartItem line = owned(customerId, cartItemId);
+        Product product = catalog.product(line.getProductId());
+        LocalDate today = time.today();
+        int qty = req.quantity() != null ? req.quantity() : line.getQuantity();
+        LocalDate date = req.deliveryDate() != null ? req.deliveryDate() : line.getDeliveryDate();
+        if (req.deliveryDate() != null) {
+            checkDeliveryDate(date, today);
+        }
+
+        CartItem result = line;
+        CartItem other = date.equals(line.getDeliveryDate()) ? null
+                : cart.findFirstByCustomerIdAndProductIdAndDeliveryDate(customerId, product.getId(), date).orElse(null);
+        if (other != null) {
+            if (other.getQuantity() + qty > MAX_QTY_PER_LINE) {
+                throw ApiException.badRequest("QUANTITY_LIMIT", "At most " + MAX_QTY_PER_LINE + " per product per day");
+            }
+            other.setQuantity(other.getQuantity() + qty);
+            cart.delete(line);
+            result = other;
+        } else {
+            line.setQuantity(qty);
+            line.setDeliveryDate(date);
+        }
+        cart.flush();
+        String when = date.equals(today.plusDays(1)) ? "tomorrow" : PromptService.CARD_DATE.format(date);
+        return new AddToCartResponse(toDto(result, product),
+                product.getName() + ": " + result.getQuantity() + " for " + when, view(customerId));
+    }
+
+    @Transactional
+    public CartResponse clear(Long customerId) {
+        requireCustomer(customerId);
+        cart.deleteAll(cart.findByCustomerIdOrderByDeliveryDateAscIdAsc(customerId));
+        cart.flush();
+        return view(customerId);
+    }
+
+    /** Small payload for the cart badge on every screen. */
+    @Transactional(readOnly = true)
+    public CartSummary summary(Long customerId) {
+        CartResponse full = view(customerId);
+        LocalDate next = full.items().stream().map(CartItemResponse::deliveryDate)
+                .filter(d -> d.isAfter(time.today())).min(LocalDate::compareTo).orElse(null);
+        return new CartSummary(full.items().size(), full.totalQuantity(), full.totalAmount(), next);
+    }
+
+    private CartItem owned(Long customerId, Long cartItemId) {
+        return cart.findById(cartItemId)
+                .filter(i -> i.getCustomerId().equals(customerId))
+                .orElseThrow(() -> ApiException.notFound("Cart item " + cartItemId));
+    }
+
+    /** Delivery dates: tomorrow .. today + 30 days. */
+    private void checkDeliveryDate(LocalDate date, LocalDate today) {
+        if (!date.isAfter(today)) {
+            throw ApiException.badRequest("INVALID_DELIVERY_DATE", "Delivery date must be tomorrow or later");
+        }
+        LocalDate max = today.plusDays(props.buyAgainMaxDaysAhead());
+        if (date.isAfter(max)) {
+            throw ApiException.badRequest("INVALID_DELIVERY_DATE", "Delivery date must be on or before " + max);
+        }
     }
 
     private CartItemResponse toDto(CartItem i, Product p) {

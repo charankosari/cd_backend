@@ -36,4 +36,12 @@ public final class CartDtos {
 
     public record AddToCartResponse(CartItemResponse item, String message, CartResponse cart) {
     }
+
+    /** PATCH /api/cart/items/{cartItemId}: send quantity and/or deliveryDate. */
+    public record UpdateCartItemRequest(@Min(1) @Max(20) Integer quantity, LocalDate deliveryDate) {
+    }
+
+    /** GET /api/cart/summary: for the cart badge. */
+    public record CartSummary(int lineCount, int totalQuantity, BigDecimal totalAmount, LocalDate nextDeliveryDate) {
+    }
 }
