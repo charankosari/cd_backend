@@ -141,7 +141,7 @@ public class OrderService {
         BigDecimal price = i.getUnitPrice() == null ? BigDecimal.ZERO : i.getUnitPrice();
         return new OrderItemView(i.getId(), p.getId(), p.getName(), p.getUnit(), i.getQuantity(), price,
                 price.multiply(BigDecimal.valueOf(i.getQuantity())), i.getPurchaseType().name(),
-                itemFeedback(o, i, p, feedback));
+                itemFeedback(o, i, p, feedback), catalog.imageUrl(p));
     }
 
     private ItemFeedback itemFeedback(CustomerOrder o, OrderItem i, Product p, Feedback feedback) {

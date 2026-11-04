@@ -109,7 +109,7 @@ public class CartService {
         BigDecimal price = p.getPrice() == null ? BigDecimal.ZERO : p.getPrice();
         return new CartItemResponse(i.getId(), p.getId(), p.getName(), p.getUnit(), price, i.getQuantity(),
                 price.multiply(BigDecimal.valueOf(i.getQuantity())), i.getDeliveryDate(),
-                i.getSource().name(), i.getFeedbackId());
+                i.getSource().name(), i.getFeedbackId(), catalog.imageUrl(p));
     }
 
     private void requireCustomer(Long customerId) {

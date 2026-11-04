@@ -67,7 +67,8 @@ public final class PromptDtos {
                                 LocalDate minDate,
                                 LocalDate maxDate,
                                 List<QuickDate> quickDates,
-                                String addToCartPath) {
+                                String addToCartPath,
+                                String imageUrl) {
     }
 
     public record QuickDate(String label, LocalDate date) {

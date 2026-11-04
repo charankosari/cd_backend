@@ -45,6 +45,7 @@ public class SecurityConfig {
                         .requestMatchers(antMatcher("/api/admin/**")).permitAll()
                         .requestMatchers(antMatcher(HttpMethod.GET, "/api/products/**")).permitAll()
                         .requestMatchers(antMatcher("/uploads/**")).permitAll()
+                        .requestMatchers(antMatcher(HttpMethod.GET, "/products/**")).permitAll()   // product images
                         .requestMatchers(antMatcher("/dashboard.html")).permitAll()
                         .requestMatchers(antMatcher("/h2-console/**")).permitAll()
                         .requestMatchers(antMatcher("/error")).permitAll()

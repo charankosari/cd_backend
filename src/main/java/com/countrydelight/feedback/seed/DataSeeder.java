@@ -131,13 +131,29 @@ public class DataSeeder implements ApplicationRunner {
     // ------------------------------------------------------------------ catalog
 
     private void seedCatalog() {
-        product("PANEER", "Fresh Paneer", "200 g", "95", 1);
-        product("DAHI", "Fresh Dahi", "400 g", "45", 1);
-        product("BREAD", "Whole Wheat Bread", "400 g", "50", 2);
-        product("ATTA", "Chakki Atta", "5 kg", "285", 5);
-        product("GHEE", "Desi Cow Ghee", "500 ml", "375", 7);
+        // Images: resources/static/products/* (served at /products/*). Prices and texts are illustrative demo data.
+        product("PANEER", "Fresh Paneer", "200 g", "95", 1, "paneer.jpg", "Dairy",
+                "Soft malai paneer made fresh from cow milk. Best used within 2 days.");
+        product("DAHI", "Fresh Dahi", "400 g", "45", 1, "dahi.jpg", "Dairy",
+                "Thick, set curd with a mild taste. Keep refrigerated.");
+        product("BREAD", "Whole Wheat Bread", "400 g", "50", 2, "bread.jpg", "Bakery",
+                "Soft whole wheat loaf, baked daily.");
+        product("ATTA", "Chakki Atta", "5 kg", "285", 5, "atta.png", "Staples",
+                "Stone-ground whole wheat flour for soft rotis.");
+        product("GHEE", "Desi Cow Ghee", "500 ml", "375", 7, "ghee.jpg", "Dairy",
+                "Slow-cooked from cow milk butter, with a rich aroma.");
         // Mostly bought on subscription; no X configured, so we never ask (shows FEEDBACK_NOT_CONFIGURED).
-        product("MILK", "Cow Milk", "500 ml", "34", null);
+        product("MILK", "Cow Milk", "500 ml", "34", null, "milk.png", "Dairy",
+                "Fresh cow milk, delivered every morning.");
+        // Extra catalog products (each with its own X and issue chips).
+        product("BUTTER", "White Butter", "100 g", "60", 3, "butter.png", "Dairy",
+                "Unsalted white butter churned from cow milk cream.");
+        product("EGGS", "Farm Eggs", "6 pcs", "72", 2, "eggs.png", "Eggs",
+                "Brown farm eggs, packed in a protective tray.");
+        product("HONEY", "Raw Honey", "250 g", "199", 7, "honey.png", "Staples",
+                "Unprocessed raw honey. May crystallise naturally in cold weather.");
+        product("COCONUT_WATER", "Tender Coconut Water", "200 ml", "45", 1, "coconut.png", "Beverages",
+                "Fresh tender coconut water. Best chilled, drink within a day.");
 
         issues("PANEER", "HARD:Too hard / rubbery", "SMELL:Bad smell", "NEAR_EXPIRY:Close to expiry",
                 "SOUR:Sour taste", "CRUMBLY:Crumbles / breaks", "PACKAGING:Packet damaged", "OTHER:Something else");
@@ -149,11 +165,20 @@ public class DataSeeder implements ApplicationRunner {
                 "ROTI_HARD:Rotis turn hard", "BAG_TORN:Bag torn", "OTHER:Something else");
         issues("GHEE", "WEAK_AROMA:Weak aroma", "RANCID:Off / rancid taste", "TEXTURE:Grainy / odd texture",
                 "LEAKING:Jar leaking", "NEAR_EXPIRY:Close to expiry", "OTHER:Something else");
+        issues("BUTTER", "RANCID:Off / rancid taste", "SMELL:Bad smell", "MELTED:Melted on arrival",
+                "NEAR_EXPIRY:Close to expiry", "PACKAGING:Wrapper torn", "OTHER:Something else");
+        issues("EGGS", "CRACKED:Cracked / broken", "NOT_FRESH:Not fresh", "SMELL:Bad smell",
+                "SMALL:Too small", "DIRTY:Dirty shells", "OTHER:Something else");
+        issues("HONEY", "TASTE:Off taste", "TOO_THIN:Too runny / watery", "CRYSTALLISED:Crystallised",
+                "LEAKING:Jar leaking", "OTHER:Something else");
+        issues("COCONUT_WATER", "SOUR:Sour / fermented", "NOT_FRESH:Not fresh", "TASTE:Bland / off taste",
+                "LEAKING:Bottle leaking", "NEAR_EXPIRY:Close to expiry", "OTHER:Something else");
     }
 
-    private void product(String id, String name, String unit, String price, Integer delay) {
+    private void product(String id, String name, String unit, String price, Integer delay, String image,
+                         String category, String description) {
         Product p = products.save(new Product(id, name, unit, new BigDecimal(price), delay,
-                "https://example.com/img/" + id.toLowerCase() + ".png"));
+                "/products/" + image, description, category));
         productMap.put(id, p);
     }
 

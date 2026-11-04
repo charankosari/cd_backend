@@ -233,7 +233,7 @@ public class PromptService {
                 Math.max(1, quantity), tomorrow, tomorrow, today.plusDays(props.buyAgainMaxDaysAhead()),
                 List.of(new QuickDate("Tomorrow", tomorrow),
                         new QuickDate(CARD_DATE.format(today.plusDays(2)), today.plusDays(2))),
-                "/api/cart/items");
+                "/api/cart/items", catalog.imageUrl(product));
     }
 
     @Transactional
@@ -266,7 +266,7 @@ public class PromptService {
 
     private PromptCard toCard(FeedbackPrompt p) {
         Product product = catalog.product(p.getProductId());
-        return new PromptCard(p.getId(), product.getId(), product.getName(), product.getUnit(), product.getImageUrl(),
+        return new PromptCard(p.getId(), product.getId(), product.getName(), product.getUnit(), catalog.imageUrl(product),
                 "How was your " + product.getName() + "?",
                 "Delivered on " + CARD_DATE.format(p.getDeliveryDate()),
                 p.getOrderId(), p.getDeliveryDate(), p.getExpiresOn(),

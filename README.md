@@ -143,6 +143,10 @@ The demo clock affects feedback rules only. OTPs and tokens always use the real 
 | Atta | 5 | Needs a few rounds of rotis before people can judge it |
 | Ghee | 7 | Used a spoon at a time; aroma and texture are judged over a week |
 | Milk | none | Almost always on subscription, so we never ask |
+| Coconut water | 1 | Drunk the same or next day |
+| Eggs | 2 | Freshness and cracks show within a couple of days |
+| Butter | 3 | Used a little each day |
+| Honey | 7 | Used slowly, like ghee |
 
 X is stored per product (`products.feedback_delay_days`) and can be changed at runtime.
 
@@ -255,7 +259,15 @@ straight away. Then `/rating` or `/skip` as usual.
 - Works on any delivered item of a product that collects feedback, including one skipped earlier. `409 ALREADY_RATED` / `NOT_DELIVERED`.
 - Marked `source = USER`. It **doesn't count toward the 3-day frequency cap**, because the user chose to rate, so we didn't nag them. An abandoned one is never pushed to the home screen.
 - The rating still counts for the 30-day "don't ask about this product again" rule.
-Open: `GET /api/products`, `GET /api/products/{id}/issue-options`.
+Open: `GET /api/products`, `GET /api/products/{id}`, `GET /api/products/{id}/issue-options`.
+
+### Products and images
+10 seeded products (Paneer, Dahi, Bread, Atta, Ghee, Milk, Butter, Eggs, Honey, Coconut water) with price, pack size, description, category and image.
+Images are in `src/main/resources/static/products/` and served openly at `/products/<file>`. Every `imageUrl` in the
+API is a full URL built from the request (`server.forward-headers-strategy: framework` makes it `https://` behind
+Railway). Paneer, dahi, bread and ghee photos come from the cd-web design assets; atta, milk, butter, eggs, honey and coconut water are illustrations
+drawn for this project. To add a product: add a `product(...)` line (and `issues(...)` if it collects feedback) in
+`DataSeeder.seedCatalog()`, and put its image in `static/products/`.
 
 ## API (dashboard, open: quality team)
 

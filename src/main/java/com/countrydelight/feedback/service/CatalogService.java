@@ -8,6 +8,8 @@ import com.countrydelight.feedback.repository.ProductRepository;
 import com.countrydelight.feedback.web.dto.PromptDtos.IssueOptionDto;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 import java.util.Collection;
 import java.util.Comparator;
@@ -35,6 +37,22 @@ public class CatalogService {
     @Transactional(readOnly = true)
     public List<Product> allProducts() {
         return products.findAll().stream().sorted((a, b) -> a.getId().compareTo(b.getId())).toList();
+    }
+
+    /**
+     * Full image URL for API responses, e.g. "https://<this-server>/products/paneer.jpg", so apps can load it directly.
+     * Built from the current request; behind Railway's proxy, X-Forwarded-* headers make it https
+     * (server.forward-headers-strategy in application.yml).
+     */
+    public String imageUrl(Product p) {
+        String path = p == null ? null : p.getImageUrl();
+        if (path == null || path.isBlank() || path.startsWith("http://") || path.startsWith("https://")) {
+            return path;
+        }
+        if (RequestContextHolder.getRequestAttributes() == null) {
+            return path;                       // not inside a web request (e.g. startup): keep the relative path
+        }
+        return ServletUriComponentsBuilder.fromCurrentContextPath().path(path).toUriString();
     }
 
     @Transactional(readOnly = true)

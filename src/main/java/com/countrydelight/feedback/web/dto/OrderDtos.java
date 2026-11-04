@@ -34,7 +34,8 @@ public final class OrderDtos {
                                 BigDecimal unitPrice,
                                 BigDecimal lineTotal,
                                 String purchaseType,   // ONE_TIME | SUBSCRIPTION
-                                ItemFeedback feedback) {
+                                ItemFeedback feedback,
+                                String imageUrl) {
     }
 
     /**

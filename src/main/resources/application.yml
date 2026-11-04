@@ -31,6 +31,8 @@ spring:
 server:
   # 8080 is often taken (Jenkins etc.)
   port: ${PORT:8081}
+  # Behind Railway's HTTPS proxy: trust X-Forwarded-* so generated URLs (product images) are https://<public host>
+  forward-headers-strategy: framework
 
 app:
   zone: Asia/Kolkata

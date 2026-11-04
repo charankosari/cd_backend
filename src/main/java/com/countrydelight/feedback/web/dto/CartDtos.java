@@ -27,7 +27,8 @@ public final class CartDtos {
                                    BigDecimal lineTotal,
                                    LocalDate deliveryDate,
                                    String source,
-                                   Long feedbackId) {
+                                   Long feedbackId,
+                                   String imageUrl) {
     }
 
     public record CartResponse(Long customerId, List<CartItemResponse> items, int totalQuantity, BigDecimal totalAmount) {
