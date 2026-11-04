@@ -1,6 +1,11 @@
 package com.countrydelight.feedback.web.dto;
 
+import com.countrydelight.feedback.domain.FollowUpStatus;
 import com.countrydelight.feedback.web.dto.PromptDtos.IssueOptionDto;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
+
+import java.time.Instant;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -92,7 +97,15 @@ public final class DashboardDtos {
                               LocalDate deliveryDate,
                               String area,
                               String city,
-                              Long customerId) {
+                              Long customerId,
+                              String productUnit,          // pack size, e.g. "200 g"
+                              String followUpStatus,       // NEW | IN_PROGRESS | RESOLVED (quality team)
+                              String internalNote,         // quality team only, never shown to customers
+                              Instant followUpUpdatedAt) {
+    }
+
+    /** PUT /api/dashboard/feedback/{feedbackId}/follow-up */
+    public record FollowUpRequest(@NotNull FollowUpStatus status, @Size(max = 1000) String internalNote) {
     }
 
     public record Page<T>(List<T> content, int page, int size, long totalElements, int totalPages) {

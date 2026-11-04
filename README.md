@@ -270,6 +270,10 @@ Filters are optional on every endpoint: `from`, `to` (delivery dates, default la
   - `alerts`: the patterns below
 - `GET /api/dashboard/feedback?issueCode=&maxRating=&page=&size=`: individual rows for tracing (order id, delivery date, area, note, photo).
 - `GET /api/dashboard/filters`: products with their chips, and areas.
+- `PUT /api/dashboard/feedback/{feedbackId}/follow-up` `{"status": "NEW" | "IN_PROGRESS" | "RESOLVED", "internalNote": "..."}`
+  (note ≤ 1000 chars, internal only): the quality team's handling of a feedback, shared by everyone on the team.
+  Returns the updated row. Each feedback row also carries `productUnit`, `followUpStatus`, `internalNote` and `followUpUpdatedAt`.
+  Used by the `cd-web` dashboard (`../cd-web`).
 
 **Pattern alerts:**
 

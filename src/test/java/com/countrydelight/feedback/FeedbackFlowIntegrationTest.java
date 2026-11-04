@@ -418,6 +418,22 @@ class FeedbackFlowIntegrationTest {
         assertThat(rows.path("totalElements").asLong()).isEqualTo(1);
         JsonNode none = getJson(get("/api/dashboard/feedback").param("productId", "GHEE"));
         assertThat(none.path("totalElements").asLong()).isZero();
+
+        // Row carries pack size and starts as NEW; the quality team's follow-up is saved server-side.
+        JsonNode row = rows.path("content").get(0);
+        assertThat(row.path("productUnit").asText()).isEqualTo("1 unit");
+        assertThat(row.path("followUpStatus").asText()).isEqualTo("NEW");
+        MvcResult upd = mvc.perform(put("/api/dashboard/feedback/" + fid + "/follow-up").contentType(MediaType.APPLICATION_JSON)
+                .content("{\"status\":\"IN_PROGRESS\",\"internalNote\":\"  Check Sector 45 batch \"}")).andReturn();
+        assertThat(upd.getResponse().getStatus()).isEqualTo(200);
+        JsonNode after = getJson(get("/api/dashboard/feedback"));
+        assertThat(after.path("content").get(0).path("followUpStatus").asText()).isEqualTo("IN_PROGRESS");
+        assertThat(after.path("content").get(0).path("internalNote").asText()).isEqualTo("Check Sector 45 batch");
+        assertThat(after.path("content").get(0).path("followUpUpdatedAt").asText()).isNotEmpty();
+        assertThat(mvc.perform(put("/api/dashboard/feedback/" + fid + "/follow-up").contentType(MediaType.APPLICATION_JSON)
+                .content("{\"status\":\"DONE\"}")).andReturn().getResponse().getStatus()).isEqualTo(400);
+        assertThat(mvc.perform(put("/api/dashboard/feedback/999999/follow-up").contentType(MediaType.APPLICATION_JSON)
+                .content("{\"status\":\"RESOLVED\"}")).andReturn().getResponse().getStatus()).isEqualTo(404);
     }
 
     @Test

@@ -5,6 +5,7 @@ import com.countrydelight.feedback.common.TimeProvider;
 import com.countrydelight.feedback.config.FeedbackProperties;
 import com.countrydelight.feedback.domain.Customer;
 import com.countrydelight.feedback.domain.Feedback;
+import com.countrydelight.feedback.domain.FollowUpStatus;
 import com.countrydelight.feedback.domain.Product;
 import com.countrydelight.feedback.repository.CartItemRepository;
 import com.countrydelight.feedback.repository.CustomerRepository;
@@ -26,6 +27,7 @@ import com.countrydelight.feedback.web.dto.DashboardDtos.TrendPoint;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -283,13 +285,34 @@ public class DashboardService {
                 .toList();
         int fromIdx = Math.min(page * size, rows.size());
         int toIdx = Math.min(fromIdx + size, rows.size());
+        Map<String, Product> products = productIndex();
         List<FeedbackRow> content = rows.subList(fromIdx, toIdx).stream()
-                .map(f -> new FeedbackRow(f.getId(), f.getCreatedOn(), f.getRating(), f.getProductId(), f.getProductName(),
-                        catalog.toDtos(f.getProductId(), f.getIssueCodes(), labels), f.getNote(), f.getPhotoUrl(),
-                        f.getOrderId(), f.getOrderItemId(), f.getDeliveryDate(), f.getArea(), f.getCity(), f.getCustomerId()))
+                .map(f -> toRow(f, labels, products))
                 .toList();
         int totalPages = (int) Math.ceil(rows.size() / (double) size);
         return new Page<>(content, page, size, rows.size(), totalPages);
+    }
+
+    /** Quality team sets status (New / In progress / Resolved) and an internal note on one feedback. */
+    @Transactional
+    public FeedbackRow updateFollowUp(Long feedbackId, FollowUpStatus status, String internalNote) {
+        Feedback f = feedbacks.findById(feedbackId).orElseThrow(() -> ApiException.notFound("Feedback " + feedbackId));
+        String note = internalNote == null || internalNote.isBlank() ? null : internalNote.trim();
+        f.updateFollowUp(status, note, Instant.now());
+        return toRow(f, catalog.issueLabelIndex(), productIndex());
+    }
+
+    private FeedbackRow toRow(Feedback f, Map<String, String> labels, Map<String, Product> products) {
+        Product p = products.get(f.getProductId());
+        return new FeedbackRow(f.getId(), f.getCreatedOn(), f.getRating(), f.getProductId(), f.getProductName(),
+                catalog.toDtos(f.getProductId(), f.getIssueCodes(), labels), f.getNote(), f.getPhotoUrl(),
+                f.getOrderId(), f.getOrderItemId(), f.getDeliveryDate(), f.getArea(), f.getCity(), f.getCustomerId(),
+                p == null ? null : p.getUnit(), f.getFollowUpStatus().name(), f.getInternalNote(),
+                f.getFollowUpUpdatedAt());
+    }
+
+    private Map<String, Product> productIndex() {
+        return catalog.allProducts().stream().collect(Collectors.toMap(Product::getId, Function.identity()));
     }
 
     @Transactional(readOnly = true)

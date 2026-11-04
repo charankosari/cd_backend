@@ -73,7 +73,23 @@ public class Feedback {
     private LocalDate createdOn;
     private Instant detailsSubmittedAt;
 
+    /** Quality-team follow-up, set from the dashboard. Internal only. */
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private FollowUpStatus followUpStatus = FollowUpStatus.NEW;
+
+    @Column(length = 1000)
+    private String internalNote;
+
+    private Instant followUpUpdatedAt;
+
     protected Feedback() {
+    }
+
+    public void updateFollowUp(FollowUpStatus status, String internalNote, Instant at) {
+        this.followUpStatus = status;
+        this.internalNote = internalNote;
+        this.followUpUpdatedAt = at;
     }
 
     public Feedback(FeedbackPrompt prompt, String productName, PurchaseType purchaseType, int rating,
@@ -125,4 +141,7 @@ public class Feedback {
     public Instant getCreatedAt() { return createdAt; }
     public LocalDate getCreatedOn() { return createdOn; }
     public Instant getDetailsSubmittedAt() { return detailsSubmittedAt; }
+    public FollowUpStatus getFollowUpStatus() { return followUpStatus; }
+    public String getInternalNote() { return internalNote; }
+    public Instant getFollowUpUpdatedAt() { return followUpUpdatedAt; }
 }
