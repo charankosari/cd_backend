@@ -6,6 +6,8 @@ import com.countrydelight.feedback.config.FeedbackProperties;
 import com.countrydelight.feedback.domain.Feedback;
 import com.countrydelight.feedback.domain.FeedbackPrompt;
 import com.countrydelight.feedback.domain.OrderItem;
+import com.countrydelight.feedback.domain.OrderStatus;
+import com.countrydelight.feedback.domain.PromptSource;
 import com.countrydelight.feedback.domain.Product;
 import com.countrydelight.feedback.domain.PromptReason;
 import com.countrydelight.feedback.domain.PromptStatus;
@@ -59,13 +61,14 @@ public class PromptService {
     private final SubscriptionRepository subscriptions;
     private final CustomerRepository customers;
     private final CatalogService catalog;
+    private final DeliveryService deliveries;
     private final TimeProvider time;
     private final FeedbackProperties props;
 
     public PromptService(EligibilityEngine engine, FeedbackPromptRepository prompts, FeedbackRepository feedbacks,
                          OrderItemRepository orderItems, SubscriptionRepository subscriptions,
-                         CustomerRepository customers, CatalogService catalog, TimeProvider time,
-                         FeedbackProperties props) {
+                         CustomerRepository customers, CatalogService catalog, DeliveryService deliveries,
+                         TimeProvider time, FeedbackProperties props) {
         this.engine = engine;
         this.prompts = prompts;
         this.feedbacks = feedbacks;
@@ -73,6 +76,7 @@ public class PromptService {
         this.subscriptions = subscriptions;
         this.customers = customers;
         this.catalog = catalog;
+        this.deliveries = deliveries;
         this.time = time;
         this.props = props;
     }
@@ -84,11 +88,14 @@ public class PromptService {
     @Transactional
     public PromptResponse nextPrompt(Long customerId) {
         requireCustomer(customerId);
+        deliveries.markDueOrdersDelivered(customerId);
         LocalDate today = time.today();
         Instant now = time.now();
 
         // 1. A card is already out there: keep showing the same one until it is answered / skipped / ignored.
-        Optional<FeedbackPrompt> pendingOpt = prompts.findFirstByCustomerIdAndStatusOrderByIdDesc(customerId, PromptStatus.PENDING);
+        //    Only cards WE started (AUTO). A "Rate now" the user opened and left isn't pushed onto the home screen.
+        Optional<FeedbackPrompt> pendingOpt = prompts.findFirstByCustomerIdAndStatusAndSourceOrderByIdDesc(
+                customerId, PromptStatus.PENDING, PromptSource.AUTO);
         if (pendingOpt.isPresent()) {
             FeedbackPrompt pending = pendingOpt.get();
             if (subscriptions.isSubscribed(customerId, pending.getProductId(), today)) {
@@ -132,12 +139,53 @@ public class PromptService {
 
     @Transactional(readOnly = true)
     public FrequencyCap frequencyCap(Long customerId, LocalDate today) {
+        // Only asks WE made count. Ratings the user chose to give ("Rate now") don't use up the cap.
         Optional<LocalDate> last = prompts.findByCustomerIdOrderByIdAsc(customerId).stream()
+                .filter(p -> !p.isUserInitiated())
                 .filter(p -> COUNTS_FOR_CAP.contains(p.getStatus()) && p.getResolvedOn() != null)
                 .map(FeedbackPrompt::getResolvedOn)
                 .max(Comparator.naturalOrder());
         LocalDate next = last.map(d -> d.plusDays(props.userCooldownDays())).orElse(null);
         return new FrequencyCap(last.orElse(null), next, next != null && today.isBefore(next));
+    }
+
+    /**
+     * "Rate now": the user doesn't want to wait X days. Opens a card for this delivered item straight away,
+     * with no waiting period, no frequency cap and no priority ranking. Then use the normal rating/skip endpoints.
+     */
+    @Transactional
+    public PromptResponse rateNow(Long customerId, Long orderItemId) {
+        requireCustomer(customerId);
+        deliveries.markDueOrdersDelivered(customerId);
+        LocalDate today = time.today();
+
+        OrderItem item = orderItems.findWithOrder(orderItemId)
+                .filter(i -> i.getOrder().getCustomerId().equals(customerId))
+                .orElseThrow(() -> ApiException.notFound("Order item " + orderItemId));
+        if (item.getOrder().getStatus() != OrderStatus.DELIVERED) {
+            throw ApiException.conflict("NOT_DELIVERED",
+                    "You can rate this once it's delivered (" + CARD_DATE.format(item.deliveryDate()) + ")");
+        }
+        Product product = catalog.product(item.getProductId());
+        if (product.getFeedbackDelayDays() == null) {
+            throw ApiException.badRequest("FEEDBACK_NOT_AVAILABLE", "We don't collect feedback for " + product.getName());
+        }
+
+        FeedbackPrompt prompt = prompts.findByOrderItemId(orderItemId).orElse(null);
+        if (prompt == null) {
+            prompt = new FeedbackPrompt(customerId, product.getId(), item.getId(), item.getOrder().getId(),
+                    item.deliveryDate(), today, today.plusDays(props.windowDays()),
+                    item.getOrder().getArea(), item.getOrder().getCity(),
+                    List.of(PromptReason.USER_REQUESTED), PromptReason.USER_REQUESTED.weight(), time.now());
+            prompt.openForUser();
+            prompts.save(prompt);
+        } else if (prompt.getStatus() == PromptStatus.ANSWERED) {
+            throw ApiException.conflict("ALREADY_RATED", "You've already rated this delivery");
+        } else if (prompt.getStatus() != PromptStatus.PENDING) {
+            prompt.openForUser();          // skipped / ignored earlier, but now the user wants to rate it
+        }
+        // PENDING: return the same card (if it's the home-screen card, rating it here answers that card too)
+        return PromptResponse.shown(toCard(prompt));
     }
 
     /** One tap = one rating. Saves immediately, then tells the app which screen comes next. */

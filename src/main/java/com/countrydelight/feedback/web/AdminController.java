@@ -102,7 +102,7 @@ public class AdminController {
     }
 
     public record PromptHistory(Long promptId, String productId, Long orderItemId, LocalDate deliveryDate,
-                                LocalDate dueOn, LocalDate expiresOn, String status, int shownDays,
+                                LocalDate dueOn, LocalDate expiresOn, String status, String source, int shownDays,
                                 LocalDate lastShownOn, LocalDate resolvedOn, List<String> reasons) {
     }
 
@@ -133,7 +133,8 @@ public class AdminController {
 
     private static PromptHistory toHistory(FeedbackPrompt p) {
         return new PromptHistory(p.getId(), p.getProductId(), p.getOrderItemId(), p.getDeliveryDate(), p.getDueOn(),
-                p.getExpiresOn(), p.getStatus().name(), p.getShownDays(), p.getLastShownOn(), p.getResolvedOn(),
+                p.getExpiresOn(), p.getStatus().name(), p.getSource().name(), p.getShownDays(), p.getLastShownOn(),
+                p.getResolvedOn(),
                 p.reasonList().stream().map(Enum::name).toList());
     }
 

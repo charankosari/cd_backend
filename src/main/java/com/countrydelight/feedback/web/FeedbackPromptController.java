@@ -3,6 +3,7 @@ package com.countrydelight.feedback.web;
 import com.countrydelight.feedback.auth.CurrentCustomer;
 import com.countrydelight.feedback.service.PromptService;
 import com.countrydelight.feedback.web.dto.PromptDtos.PromptResponse;
+import com.countrydelight.feedback.web.dto.PromptDtos.RateNowRequest;
 import com.countrydelight.feedback.web.dto.PromptDtos.RatingRequest;
 import com.countrydelight.feedback.web.dto.PromptDtos.RatingResponse;
 import com.countrydelight.feedback.web.dto.PromptDtos.SkipResponse;
@@ -27,6 +28,12 @@ public class FeedbackPromptController {
     @GetMapping("/next")
     public PromptResponse next(@CurrentCustomer Long customerId) {
         return prompts.nextPrompt(customerId);
+    }
+
+    /** "Rate now": skip the X-day wait for one delivered item. Returns the card; then use /rating or /skip. */
+    @PostMapping("/rate-now")
+    public PromptResponse rateNow(@CurrentCustomer Long customerId, @Valid @RequestBody RateNowRequest body) {
+        return prompts.rateNow(customerId, body.orderItemId());
     }
 
     @PostMapping("/{promptId}/rating")

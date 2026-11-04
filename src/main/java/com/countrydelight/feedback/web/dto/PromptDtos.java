@@ -45,6 +45,10 @@ public final class PromptDtos {
     public record RatingRequest(@NotNull @Min(1) @Max(5) Integer rating) {
     }
 
+    /** POST /api/feedback-prompts/rate-now: which delivered item to rate right away. */
+    public record RateNowRequest(@NotNull Long orderItemId) {
+    }
+
     public record RatingResponse(Long feedbackId,
                                  Long promptId,
                                  int rating,

@@ -61,6 +61,10 @@ public class CustomerOrder {
         return item;
     }
 
+    public void markDelivered() {
+        this.status = OrderStatus.DELIVERED;
+    }
+
     public Long getId() { return id; }
     public Long getCustomerId() { return customerId; }
     public LocalDate getDeliveryDate() { return deliveryDate; }

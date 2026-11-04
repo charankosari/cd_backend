@@ -61,6 +61,10 @@ public class FeedbackPrompt {
     @Column(nullable = false)
     private PromptStatus status = PromptStatus.PENDING;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private PromptSource source = PromptSource.AUTO;
+
     private Instant createdAt;
     private LocalDate firstShownOn;
     private LocalDate lastShownOn;
@@ -99,6 +103,18 @@ public class FeedbackPrompt {
         }
     }
 
+    /** The user chose "Rate now": this prompt is theirs, and a skipped/ignored one opens again. */
+    public void openForUser() {
+        this.source = PromptSource.USER;
+        this.status = PromptStatus.PENDING;
+        this.resolvedOn = null;
+        this.resolvedAt = null;
+    }
+
+    public boolean isUserInitiated() {
+        return source == PromptSource.USER;
+    }
+
     public void resolve(PromptStatus newStatus, LocalDate on, Instant at) {
         this.status = newStatus;
         this.resolvedOn = on;
@@ -124,6 +140,7 @@ public class FeedbackPrompt {
     public String getCity() { return city; }
     public int getPriorityScore() { return priorityScore; }
     public PromptStatus getStatus() { return status; }
+    public PromptSource getSource() { return source; }
     public Instant getCreatedAt() { return createdAt; }
     public LocalDate getFirstShownOn() { return firstShownOn; }
     public LocalDate getLastShownOn() { return lastShownOn; }

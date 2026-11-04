@@ -1,0 +1,50 @@
+package com.countrydelight.feedback.web.dto;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.util.List;
+
+public final class OrderDtos {
+
+    private OrderDtos() {
+    }
+
+    /** POST /api/orders. Body optional; deliveryDate = only order the cart lines for that date. */
+    public record PlaceOrderRequest(LocalDate deliveryDate) {
+    }
+
+    public record PlaceOrderResponse(List<OrderView> orders, String message) {
+    }
+
+    public record OrderView(Long orderId,
+                            LocalDate deliveryDate,
+                            String status,          // SCHEDULED | DELIVERED | CANCELLED
+                            String area,
+                            String city,
+                            int totalQuantity,
+                            BigDecimal totalAmount,
+                            List<OrderItemView> items) {
+    }
+
+    public record OrderItemView(Long orderItemId,
+                                String productId,
+                                String productName,
+                                String unit,
+                                int quantity,
+                                BigDecimal unitPrice,
+                                BigDecimal lineTotal,
+                                String purchaseType,   // ONE_TIME | SUBSCRIPTION
+                                ItemFeedback feedback) {
+    }
+
+    /**
+     * Feedback state of one delivered item, so the orders screen can show "Rate now" or "Rated 4★".
+     * status: NOT_DELIVERED | NOT_RATED | RATED | NOT_AVAILABLE (product has no feedback)
+     */
+    public record ItemFeedback(String status,
+                               boolean canRateNow,
+                               LocalDate autoAskOn,   // when the home-screen card would ask by itself
+                               Integer rating,
+                               Long feedbackId) {
+    }
+}

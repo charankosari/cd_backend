@@ -15,12 +15,34 @@ includes `nextStep` so the app knows which screen comes next.
 cd backend
 cp .env.example .env             # optional: local settings (DB, secrets, port)
 mvn spring-boot:run              # http://localhost:8081
-mvn test                         # 34 integration tests (feedback rules + login/OTP)
+mvn test                         # 41 integration tests (feedback rules, login/OTP, orders, rate now)
 ```
 
 - In-memory H2 database, seeded on every start **relative to today**, so the demo always lines up.
 - DB console: http://localhost:8081/h2-console (JDBC URL `jdbc:h2:mem:feedback`, user `sa`)
 - Ready-made calls: [`requests.http`](requests.http) (VS Code REST Client / IntelliJ HTTP client)
+
+---
+
+## Deployed (Railway)
+
+**Live URL:** https://cd-feedback-backend-production.up.railway.app (project `perfect-ambition`, service `cd-feedback-backend`)
+
+- Railway builds the [`Dockerfile`](Dockerfile) on its own servers (Maven + JDK 21 → JRE 21 image). No Docker needed locally.
+- Variables set on the service: `JWT_SECRET` (random), `OTP_FIXED_CODE=123456`, `H2_CONSOLE=false`,
+  `SEED_ENABLED=true`, `JWT_TTL_HOURS=168`. Railway injects `PORT` itself.
+- **Photos:** a Railway **Volume** (`cd-feedback-backend-volume`) is mounted at `/app/uploads`, the folder the app
+  already saves to, so uploaded issue photos **survive redeploys and restarts**.
+- **Data:** still H2 in memory, so orders, ratings and signups reset on every deploy or restart (photo files stay on
+  the volume). That's fine for the demo. For lasting data, add a Railway Postgres and set `DB_URL`, `DB_USERNAME`,
+  `DB_PASSWORD`, `DB_DDL_AUTO=update`, `SEED_ENABLED=false`.
+
+Redeploy after changing code (needs the project token; never commit it):
+```bash
+cd backend
+$env:RAILWAY_TOKEN="<project token>"          # PowerShell  (bash: export RAILWAY_TOKEN=...)
+npx -y @railway/cli up --service cd-feedback-backend --ci
+```
 
 ---
 
@@ -221,6 +243,18 @@ Multipart, field `file`. JPEG/PNG/WEBP/HEIC, max 5 MB → `{"feedbackId": 349, "
 - Returns `201` with `{item, message: "Desi Cow Ghee added for tomorrow", cart}`.
 
 `GET /api/cart`, `DELETE /api/cart/items/{id}`, `GET /api/auth/me`.
+
+### Orders
+- `POST /api/orders` (body optional: `{"deliveryDate": "..."}`): checkout. Cart lines become one `SCHEDULED` order per delivery date, and the cart is emptied.
+- An order becomes `DELIVERED` automatically on its delivery date (a stand-in for the delivery system; it follows the demo clock). From then on, the normal X-day feedback rules apply to it.
+- `GET /api/orders`, `GET /api/orders/{id}`: newest first. Each item has `feedback: {status, canRateNow, autoAskOn, rating?, feedbackId?}`.
+
+### Rate now (skip the X-day wait)
+`POST /api/feedback-prompts/rate-now` `{"orderItemId": 873}` returns the same card as `/next`, for a delivered item,
+straight away. Then `/rating` or `/skip` as usual.
+- Works on any delivered item of a product that collects feedback, including one skipped earlier. `409 ALREADY_RATED` / `NOT_DELIVERED`.
+- Marked `source = USER`. It **doesn't count toward the 3-day frequency cap**, because the user chose to rate, so we didn't nag them. An abandoned one is never pushed to the home screen.
+- The rating still counts for the 30-day "don't ask about this product again" rule.
 Open: `GET /api/products`, `GET /api/products/{id}/issue-options`.
 
 ## API (dashboard, open: quality team)
@@ -280,5 +314,5 @@ src/main/java/com/countrydelight/feedback
                 FeedbackService (issue details, photo)  CartService  DashboardService  CustomerService (signup)
   web/          controllers (API routes) + dto/ (request/response shapes)
   seed/         DataSeeder (demo households + dashboard history)
-src/test/...    FeedbackFlowIntegrationTest (25) · AuthFlowIntegrationTest (6) · OtpRulesTest (3)
+src/test/...    FeedbackFlowIntegrationTest (25) · AuthFlowIntegrationTest (6) · OrdersAndRateNowTest (7) · OtpRulesTest (3)
 ```

@@ -103,8 +103,9 @@ public class EligibilityEngine {
 
         List<FeedbackPrompt> history = prompts.findByCustomerIdOrderByIdAsc(customerId);
         Set<Long> askedItems = history.stream().map(FeedbackPrompt::getOrderItemId).collect(Collectors.toSet());
+        // Only our own open cards block a product. An abandoned "Rate now" (USER) must not block it forever.
         Set<String> pendingProducts = history.stream()
-                .filter(p -> p.getStatus() == PromptStatus.PENDING)
+                .filter(p -> p.getStatus() == PromptStatus.PENDING && !p.isUserInitiated())
                 .map(FeedbackPrompt::getProductId)
                 .collect(Collectors.toSet());
         Map<String, LocalDate> ratedUntil = new HashMap<>();

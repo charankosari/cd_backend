@@ -1,6 +1,7 @@
 package com.countrydelight.feedback.repository;
 
 import com.countrydelight.feedback.domain.FeedbackPrompt;
+import com.countrydelight.feedback.domain.PromptSource;
 import com.countrydelight.feedback.domain.PromptStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 
@@ -9,7 +10,12 @@ import java.util.Optional;
 
 public interface FeedbackPromptRepository extends JpaRepository<FeedbackPrompt, Long> {
 
-    Optional<FeedbackPrompt> findFirstByCustomerIdAndStatusOrderByIdDesc(Long customerId, PromptStatus status);
+    /** The newest open card of one kind (AUTO = home-screen card) for a customer. */
+    Optional<FeedbackPrompt> findFirstByCustomerIdAndStatusAndSourceOrderByIdDesc(Long customerId, PromptStatus status,
+                                                                                  PromptSource source);
 
     List<FeedbackPrompt> findByCustomerIdOrderByIdAsc(Long customerId);
+
+    /** At most one prompt per delivered item (unique constraint). */
+    Optional<FeedbackPrompt> findByOrderItemId(Long orderItemId);
 }
