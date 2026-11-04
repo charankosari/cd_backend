@@ -1,0 +1,7 @@
+target/
+uploads/
+.env
+*.log
+.idea/
+*.iml
+.vscode/

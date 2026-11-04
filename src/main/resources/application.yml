@@ -1,0 +1,72 @@
+# ${NAME:default} = read environment variable NAME; if it isn't set, use the default.
+# Local values go in backend/.env (copy .env.example). Real servers set real environment variables.
+
+spring:
+  application:
+    name: cd-feedback-backend
+  config:
+    # Also read backend/.env (KEY=VALUE lines) if it exists. Real env variables still win over it.
+    import: optional:file:.env[.properties]
+  datasource:
+    url: ${DB_URL:jdbc:h2:mem:feedback;DB_CLOSE_DELAY=-1}
+    username: ${DB_USERNAME:sa}
+    password: ${DB_PASSWORD:}
+  jpa:
+    hibernate:
+      # create-drop = build tables at start, drop at stop (demo). Use "update" or "validate" on a real DB.
+      ddl-auto: ${DB_DDL_AUTO:create-drop}
+    open-in-view: false
+  h2:
+    console:
+      enabled: ${H2_CONSOLE:true}
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 6MB
+  jackson:
+    default-property-inclusion: non_null
+    serialization:
+      write-dates-as-timestamps: false
+
+server:
+  # 8080 is often taken (Jenkins etc.)
+  port: ${PORT:8081}
+
+app:
+  zone: Asia/Kolkata
+  upload-dir: ${UPLOAD_DIR:uploads}
+  seed:
+    # Fill demo data at startup. Turn off on a real database.
+    enabled: ${SEED_ENABLED:true}
+  auth:
+    jwt:
+      # Signs login tokens. MUST be secret and at least 32 characters. Override with JWT_SECRET in every real env.
+      secret: ${JWT_SECRET:dev-only-secret-change-me-0123456789abcdef}
+      ttl-hours: ${JWT_TTL_HOURS:168}
+      issuer: cd-feedback-backend
+    otp:
+      # No SMS provider yet, so every OTP is this fixed code. Set OTP_FIXED_CODE to empty to get random 6-digit codes.
+      fixed-code: ${OTP_FIXED_CODE:123456}
+      length: 6
+      ttl-seconds: 300
+      resend-cooldown-seconds: 30
+      max-attempts: 5
+      max-requests-per-hour: 5
+
+# All feedback rules live here so they can be tuned without code changes.
+feedback:
+  # How long a prompt stays askable after its due date (delivery + X days).
+  window-days: 3
+  # Frequency cap: after a user answers / skips / ignores a prompt, no new prompt for this many days.
+  user-cooldown-days: 3
+  # A prompt shown on this many different days with no action is treated as "ignored".
+  max-impression-days: 3
+  # Don't ask about the same product again for this long after the user rated it.
+  product-cooldown-after-answer-days: 30
+  # Don't ask about the same product again for this long after the user skipped/ignored it.
+  product-cooldown-after-skip-days: 60
+  # Ratings >= this are "good" (buy-again flow). Ratings below it go to issue capture.
+  high-rating-threshold: 4
+  note-max-length: 200
+  # Buy-again: latest delivery date the user may pick.
+  buy-again-max-days-ahead: 30

@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Feedback Quality Dashboard</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --card: #ffffff; --text: #1d2433; --muted: #667085; --line: #e4e7ec;
+    --good: #2e7d32; --bad: #c62828; --warn: #b26a00; --accent: #1565c0;
+    --heat0: #f1f8f1; --heat1: #fde2e1; --heat2: #f9b4b0; --heat3: #ef6b63;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #12151b; --card: #1b1f27; --text: #e6e9ef; --muted: #98a2b3; --line: #2b313c;
+      --good: #66bb6a; --bad: #ef5350; --warn: #ffb74d; --accent: #64b5f6;
+      --heat0: #1c2a1e; --heat1: #3a2223; --heat2: #6b2a2a; --heat3: #a83232;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); }
+  header { padding: 16px; border-bottom: 1px solid var(--line); background: var(--card); }
+  header h1 { margin: 0 0 4px; font-size: 18px; }
+  header p { margin: 0; color: var(--muted); }
+  main { max-width: 1200px; margin: 0 auto; padding: 16px; }
+  .filters { display: flex; flex-wrap: wrap; gap: 8px; align-items: end; margin-bottom: 16px; }
+  .filters label { display: flex; flex-direction: column; font-size: 12px; color: var(--muted); gap: 2px; }
+  input, select, button { font: inherit; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--card); color: var(--text); }
+  button { background: var(--accent); color: #fff; border: none; cursor: pointer; }
+  .grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); }
+  .kpis { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); margin-bottom: 16px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 14px; overflow-x: auto; }
+  .card h2 { margin: 0 0 10px; font-size: 14px; }
+  .kpi .v { font-size: 22px; font-weight: 600; }
+  .kpi .l { color: var(--muted); font-size: 12px; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; padding: 6px 6px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--muted); font-weight: 500; font-size: 12px; }
+  .num { text-align: right; font-variant-numeric: tabular-nums; }
+  .bar { height: 8px; background: var(--line); border-radius: 4px; overflow: hidden; min-width: 60px; }
+  .bar > span { display: block; height: 100%; background: var(--bad); }
+  .alert { border-left: 4px solid var(--warn); padding: 8px 10px; margin-bottom: 8px; background: var(--bg); border-radius: 6px; }
+  .alert.HIGH { border-color: var(--bad); }
+  .alert b { display: block; }
+  .tag { font-size: 11px; color: var(--muted); }
+  .stars { color: var(--warn); white-space: nowrap; }
+  .low { color: var(--bad); font-weight: 600; }
+  .empty { color: var(--muted); }
+  .full { grid-column: 1 / -1; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Product feedback: quality view</h1>
+  <p>Ratings after delivery, grouped by product, issue and area. Dates are delivery dates.</p>
+</header>
+<main>
+  <form class="filters" id="filters">
+    <label>From <input type="date" name="from"></label>
+    <label>To <input type="date" name="to"></label>
+    <label>Product <select name="productId"><option value="">All products</option></select></label>
+    <label>Area <select name="area"><option value="">All areas</option></select></label>
+    <button type="submit">Apply</button>
+  </form>
+
+  <section class="kpis" id="kpis"></section>
+
+  <section class="grid">
+    <div class="card full"><h2>Patterns to look at</h2><div id="alerts"></div></div>
+    <div class="card"><h2>By product</h2><div id="byProduct"></div></div>
+    <div class="card"><h2>Top issues</h2><div id="byIssue"></div></div>
+    <div class="card"><h2>By area</h2><div id="byArea"></div></div>
+    <div class="card"><h2>Low-rating % by product and area</h2><div id="matrix"></div></div>
+    <div class="card full"><h2>Latest low ratings (for tracing)</h2><div id="rows"></div></div>
+  </section>
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const form = $('filters');
+let productNames = {};
+
+async function getJson(url) {
+  const r = await fetch(url);
+  if (!r.ok) throw new Error((await r.json()).message || r.statusText);
+  return r.json();
+}
+
+function params() {
+  const p = new URLSearchParams();
+  for (const [k, v] of new FormData(form)) if (v) p.set(k, v);
+  return p;
+}
+
+function bar(pct) { return `<div class="bar"><span style="width:${Math.min(100, pct)}%"></span></div>`; }
+function stars(n) { return '<span class="stars">' + '★'.repeat(n) + '☆'.repeat(5 - n) + '</span>'; }
+
+async function init() {
+  const f = await getJson('/api/dashboard/filters');
+  for (const p of f.products) {
+    productNames[p.productId] = p.name;
+    form.productId.insertAdjacentHTML('beforeend', `<option value="${esc(p.productId)}">${esc(p.name)}</option>`);
+  }
+  for (const a of f.areas) form.area.insertAdjacentHTML('beforeend', `<option value="${esc(a.area)}">${esc(a.area)}, ${esc(a.city)}</option>`);
+  await load();
+}
+
+async function load() {
+  const p = params();
+  try {
+    const s = await getJson('/api/dashboard/summary?' + p);
+    if (!form.from.value) form.from.value = s.from;
+    if (!form.to.value) form.to.value = s.to;
+    render(s);
+    p.set('maxRating', '3'); p.set('size', '15');
+    renderRows(await getJson('/api/dashboard/feedback?' + p));
+  } catch (e) {
+    $('alerts').innerHTML = `<p class="low">Could not load: ${esc(e.message)}</p>`;
+  }
+}
+
+function render(s) {
+  const t = s.totals;
+  $('kpis').innerHTML = [
+    ['Ratings', t.feedbackCount], ['Average', t.avgRating.toFixed(1) + ' ★'],
+    ['Below 4', `${t.lowRatingCount} (${t.lowRatingPct}%)`], ['With issue details', t.withIssueDetails],
+    ['With photo', t.withPhoto], ['Buy-again adds', t.buyAgainAddsToCart]
+  ].map(([l, v]) => `<div class="card kpi"><div class="v">${esc(v)}</div><div class="l">${esc(l)}</div></div>`).join('');
+
+  $('alerts').innerHTML = s.alerts.length ? s.alerts.map(a => `
+    <div class="alert ${esc(a.severity)}"><b>${esc(a.title)}</b>${esc(a.message)}
+    <div class="tag">${esc(a.type)} · ${esc(a.severity)}</div></div>`).join('')
+    : '<p class="empty">No unusual patterns in this range.</p>';
+
+  $('byProduct').innerHTML = table(['Product', 'Ratings', 'Avg', 'Below 4', '', 'Top issue'], s.byProduct.map(p => [
+    esc(p.productName), num(p.count), num(p.avgRating.toFixed(1)), num(p.lowPct + '%'), bar(p.lowPct),
+    p.topIssues.length ? esc(p.topIssues[0].label) + ` <span class="tag">(${p.topIssues[0].count})</span>` : '<span class="empty">none</span>']));
+
+  const maxIssue = Math.max(1, ...s.byIssue.map(i => i.count));
+  $('byIssue').innerHTML = table(['Product', 'Issue', 'Count', ''], s.byIssue.slice(0, 12).map(i => [
+    esc(i.productName), esc(i.label), num(i.count), bar(100 * i.count / maxIssue)]));
+
+  $('byArea').innerHTML = table(['Area', 'Ratings', 'Avg', 'Below 4', 'Top issue'], s.byArea.map(a => [
+    `${esc(a.area)} <span class="tag">${esc(a.city)}</span>`, num(a.count), num(a.avgRating.toFixed(1)),
+    num(a.lowPct + '%'), esc(a.topIssue ?? '-')]));
+
+  const areas = [...new Set(s.productAreaMatrix.map(c => c.area))].sort();
+  const prods = [...new Set(s.productAreaMatrix.map(c => c.productId))].sort();
+  const cell = (p, a) => s.productAreaMatrix.find(c => c.productId === p && c.area === a);
+  const heat = (pct) => pct >= 50 ? 'var(--heat3)' : pct >= 30 ? 'var(--heat2)' : pct > 0 ? 'var(--heat1)' : 'var(--heat0)';
+  $('matrix').innerHTML = prods.length ? `<table><tr><th></th>${areas.map(a => `<th>${esc(a)}</th>`).join('')}</tr>` +
+    prods.map(p => `<tr><th>${esc(productNames[p] || p)}</th>` + areas.map(a => {
+      const c = cell(p, a);
+      return c ? `<td class="num" style="background:${heat(c.lowPct)}" title="${c.lowCount} of ${c.count} low">${c.lowPct}%</td>` : '<td class="empty num">-</td>';
+    }).join('') + '</tr>').join('') + '</table>' : '<p class="empty">No data.</p>';
+}
+
+function renderRows(page) {
+  $('rows').innerHTML = page.content.length ? table(['Rated on', 'Product', 'Rating', 'Issues', 'Note', 'Order', 'Delivered', 'Area'],
+    page.content.map(r => [
+      esc(r.createdOn), esc(r.productName), stars(r.rating),
+      r.issues.map(i => esc(i.label)).join(', ') || '<span class="empty">not given</span>',
+      esc(r.note ?? '') + (r.photoUrl ? ` <a href="${esc(r.photoUrl)}" target="_blank">photo</a>` : ''),
+      '#' + esc(r.orderId), esc(r.deliveryDate), esc(r.area)])) +
+    `<p class="tag">Showing ${page.content.length} of ${page.totalElements}</p>`
+    : '<p class="empty">No low ratings in this range.</p>';
+}
+
+function num(v) { return { html: esc(v), cls: 'num' }; }
+function table(head, rows) {
+  if (!rows.length) return '<p class="empty">No data.</p>';
+  return '<table><tr>' + head.map(h => `<th>${esc(h)}</th>`).join('') + '</tr>' +
+    rows.map(r => '<tr>' + r.map(c => typeof c === 'object' ? `<td class="${c.cls}">${c.html}</td>` : `<td>${c}</td>`).join('') + '</tr>').join('') +
+    '</table>';
+}
+
+form.addEventListener('submit', (e) => { e.preventDefault(); load(); });
+init();
+</script>
+</body>
+</html>

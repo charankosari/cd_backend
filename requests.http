@@ -1,0 +1,75 @@
+### Product feedback backend: sample calls (VS Code "REST Client" or IntelliJ HTTP client)
+@base = http://localhost:8081
+
+### Demo households and what each one tests
+GET {{base}}/api/admin/customers
+
+### --- MAIN FLOW: Kabir (106), Ghee, rate exactly 4 -> buy again
+
+### 1. Home screen asks for a card
+GET {{base}}/api/feedback-prompts/next
+X-Customer-Id: 106
+
+### 2. One-tap rating (use promptId from step 1)
+POST {{base}}/api/feedback-prompts/353/rating
+X-Customer-Id: 106
+Content-Type: application/json
+
+{ "rating": 4 }
+
+### 3. Buy again for a picked date (use feedbackId from step 2)
+POST {{base}}/api/cart/items
+X-Customer-Id: 106
+Content-Type: application/json
+
+{ "productId": "GHEE", "quantity": 1, "deliveryDate": "2026-11-06", "feedbackId": 348 }
+
+### --- LOW RATING: Asha (101), Paneer, rate 2 -> issue details
+
+GET {{base}}/api/feedback-prompts/next
+X-Customer-Id: 101
+
+###
+POST {{base}}/api/feedback-prompts/350/rating
+X-Customer-Id: 101
+Content-Type: application/json
+
+{ "rating": 2 }
+
+###
+PUT {{base}}/api/feedback/349/issues
+X-Customer-Id: 101
+Content-Type: application/json
+
+{ "issueCodes": ["SMELL", "NEAR_EXPIRY"], "note": "Smelled sour when opened" }
+
+### --- SKIP: Neha (105)
+POST {{base}}/api/feedback-prompts/352/skip
+X-Customer-Id: 105
+
+### --- Why does (or doesn't) a household get a card?
+GET {{base}}/api/admin/customers/104/eligibility
+
+### --- Time travel
+POST {{base}}/api/admin/clock
+Content-Type: application/json
+
+{ "plusDays": 2 }
+
+###
+DELETE {{base}}/api/admin/clock
+
+### Reset demo data (relative to the current simulated date)
+POST {{base}}/api/admin/reset-demo-data
+
+### --- Dashboard
+GET {{base}}/api/dashboard/summary
+
+###
+GET {{base}}/api/dashboard/summary?productId=PANEER&area=Sector 45
+
+###
+GET {{base}}/api/dashboard/feedback?maxRating=3&size=10
+
+###
+GET {{base}}/api/dashboard/filters
